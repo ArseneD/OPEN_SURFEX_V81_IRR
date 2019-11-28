@@ -1,0 +1,13 @@
+ ! NOAA/PMEL TMAP
+ ! FERRET v7.43 (optimized)
+ ! Linux 3.10.0-862.11.6.el7.x86_64 64-bit - 09/14/18
+ ! 10-Apr-19 11:22     
+
+use drdt_bst_fit_60.nc
+use "/home/minviellem/SURFEX_GIT_master/Surfex_Git2/MY_RUN/DATA/CROCUS/drdt_bst_fit_60.nc"
+sh d
+shade TAU[d=1,l=@ave]-TAU[d=2,l=@ave]
+shade KAPPA[d=1,l=@ave]-KAPPA[d=2,l=@ave]
+shade DRDTO[d=1,l=@ave]-DRDTO[d=2,l=@ave]
+shade DRDT0[d=1,l=@ave]-DRDT0[d=2,l=@ave]
+exit
