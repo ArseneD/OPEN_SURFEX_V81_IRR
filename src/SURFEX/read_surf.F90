@@ -38,7 +38,9 @@ MODULE MODI_READ_SURF
 !!    -------------
 !!
 !!      original                                                     01/08/03
-!!      J.Escobar      10/06/2013: replace DOUBLE PRECISION by REAL to handle problem for promotion of real on IBM SP
+!!      J. Escobar      10/06/2013: replace DOUBLE PRECISION by REAL to handle problem for promotion of real on IBM SP
+!!      A. Druem           02/2019: Change len 40 to 160
+!!
 !----------------------------------------------------------------------------
 !
   INTERFACE READ_SURF
@@ -1032,7 +1034,7 @@ INTEGER, INTENT(OUT) :: KRESP             ! KRESP  : return-code if a problem ap
 !
 !*      0.2   Declarations of local variables
 !
- CHARACTER(LEN=40) :: YFIELD
+ CHARACTER(LEN=160) :: YFIELD
  CHARACTER(LEN=100) :: YCOMMENT
  CHARACTER(LEN=16)  :: YREC
  CHARACTER(LEN=1)   :: YDIR
@@ -1102,7 +1104,7 @@ ELSEIF (HPROGRAM=='OFFLIN' .OR. HPROGRAM=='ASCII ' .OR. &
 #ifdef SFX_MPI
   IF (YDIR/='A' .AND. NPROC>1) THEN
     XTIME0 = MPI_WTIME()
-    CALL MPI_BCAST(YFIELD,40,MPI_CHARACTER,NPIO,NCOMM,INFOMPI)
+    CALL MPI_BCAST(YFIELD,160,MPI_CHARACTER,NPIO,NCOMM,INFOMPI)
     XTIME_COMM_READ = XTIME_COMM_READ + (MPI_WTIME() - XTIME0)
   ENDIF
 #endif

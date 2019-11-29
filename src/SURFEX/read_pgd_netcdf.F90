@@ -26,6 +26,8 @@ SUBROUTINE READ_PGD_NETCDF (UG, U, USS, &
 !!    MODIFICATIONS
 !!    -------------
 !!      Original    11/2012
+!!      A. Druel    02/2019 Changes (with irrigation). But not sure to be still important.
+!!
 !!------------------------------------------------------------------
 !
 !
@@ -61,7 +63,7 @@ TYPE(SSO_t), INTENT(INOUT) :: USS
  CHARACTER(LEN=6),  INTENT(IN) :: HSUBROUTINE   ! Name of the subroutine to call
  CHARACTER(LEN=28), INTENT(IN) :: HFILENAME     ! Name of the field file.
  CHARACTER(LEN=20),   INTENT(IN)  :: HFIELD     ! name of variable
-REAL,DIMENSION(:),INTENT(OUT),OPTIONAL :: PFIELD ! output a variable
+REAL,DIMENSION(:),INTENT(INOUT),OPTIONAL :: PFIELD ! output a variable
 
 REAL,DIMENSION(:),POINTER  :: ZLAT,ZLON
 REAL,DIMENSION(:),POINTER  :: ZLAT2D,ZLON2D
@@ -78,6 +80,7 @@ INTEGER::ID_FILE ! id of netcdf file
 INTEGER::INFIELD,INLAT,INLON ! dimension lengths
 INTEGER::ILUOUT
 INTEGER::JPOINT !loop counter
+CHARACTER(LEN=20) :: HFIELD_LOC
 !
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
@@ -85,8 +88,18 @@ IF (LHOOK) CALL DR_HOOK('READ_PGD_NETCDF',0,ZHOOK_HANDLE)
 !
 CALL GET_LUOUT(HPROGRAM,ILUOUT)
 !
-SELECT CASE (TRIM(HFIELD))
+IF (index( HFIELD , ":" )/=0) THEN
+  HFIELD_LOC=HFIELD(1:index(HFIELD,":")-1) 
+  HFIELD_LOC(index(HFIELD,":"):20)=' '
+!  HFIELD=HFIELD(1:index(HFIELD,":")-1)
+ELSE
+  HFIELD_LOC=HFIELD
+ENDIF
+
+SELECT CASE (TRIM(HFIELD_LOC))
   CASE ('ZS','slope')
+  CASE ('IRRIGTYPE: irrigatio')
+  CASE ('IRRIGTYPE')
   CASE DEFAULT
     CALL ABOR1_SFX('READ_PGD_NETCDF: '//TRIM(HFIELD)//" initialization not implemented !")
 END SELECT
@@ -97,14 +110,13 @@ END SELECT
 !
 !*      2.     Reading of field
 !              ----------------
-
 ! Open netcdf file
 IERROR=NF90_OPEN(HFILENAME,NF90_NOWRITE,ID_FILE)
 CALL HANDLE_ERR_CDF(IERROR,"can't open file "//TRIM(HFILENAME))
 
 CALL READ_FIELD_NETCDF(ID_FILE,'LAT                 ',ZLAT,INLAT)
 CALL READ_FIELD_NETCDF(ID_FILE,'LON                 ',ZLON,INLON)
-CALL READ_FIELD_NETCDF(ID_FILE,HFIELD,ZFIELD,INFIELD)
+CALL READ_FIELD_NETCDF(ID_FILE,HFIELD_LOC,ZFIELD,INFIELD)
 
 ! Close netcdf file
 IERROR=NF90_CLOSE(ID_FILE)

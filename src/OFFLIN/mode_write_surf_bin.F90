@@ -166,8 +166,8 @@ IMPLICIT NONE
 !*      0.1   Declarations of arguments
 !
  CHARACTER(LEN=12),  INTENT(IN)  :: HREC      ! name of the article to be read
- CHARACTER(LEN=40),  INTENT(IN)  :: HFIELD    ! the integer to be read
-INTEGER,            INTENT(OUT) :: KRESP     ! KRESP  : return-code if a problem appears
+ CHARACTER(LEN=160),  INTENT(IN) :: HFIELD   ! the integer to be read
+INTEGER,            INTENT(OUT)  :: KRESP      ! KRESP  : return-code if a problem appears
  CHARACTER(LEN=100), INTENT(IN)  :: HCOMMENT  ! comment string
 !
 !*      0.2   Declarations of local variables

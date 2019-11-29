@@ -26,6 +26,10 @@
 !!    MODIFICATIONS
 !!    -------------
 !!      Original       06/2006
+!!      Modifications: 
+!!        J.Etchanchu  01/2018 Add of the time count for irrigation decision rules
+!!        A.Druel      02/2019 Change names and remove old parameters (not use anymore: XTHRESHOLDSPT & LIRRIDAY)
+!!
 !
 !*       0.   DECLARATIONS
 !             ------------
@@ -45,11 +49,9 @@ INTEGER, POINTER, DIMENSION (:)   :: NIRRINUM
 LOGICAL, POINTER,DIMENSION(:)     :: LIRRIGATE 
                                         ! True if irrigation performed
 !
-LOGICAL, POINTER,DIMENSION(:)     :: LIRRIDAY 
-                                        ! True if irrigation occurs during present day
-!                                          
-REAL, POINTER, DIMENSION(:)       :: XTHRESHOLDSPT 
-                                        ! Spatialized threshold
+INTEGER, POINTER, DIMENSION (:)   :: NIRR_TSC
+                                        ! Irrigation time step counter (current irrigation + time before another irrigation) 
+                                        ! Time step counter for irrigation minimal time between triggers and water application time
 
 END TYPE AGRI_t
 !-------------------------------------------------------------------------------
@@ -69,8 +71,7 @@ REAL(KIND=JPRB) :: ZHOOK_HANDLE
 IF (LHOOK) CALL DR_HOOK("MODD_AGRI_N:AGRI_INIT",0,ZHOOK_HANDLE)
   NULLIFY(AG%NIRRINUM)
   NULLIFY(AG%LIRRIGATE)
-  NULLIFY(AG%LIRRIDAY)
-  NULLIFY(AG%XTHRESHOLDSPT)
+  NULLIFY(AG%NIRR_TSC)
 IF (LHOOK) CALL DR_HOOK("MODD_AGRI_N:AGRI_INIT",1,ZHOOK_HANDLE)
 END SUBROUTINE AGRI_INIT
 !
@@ -80,7 +81,7 @@ INTEGER, INTENT(IN) :: KPATCH
 INTEGER :: JP
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 IF (LHOOK) CALL DR_HOOK("MODD_AGRI_N:AGRI_NP_INIT",0,ZHOOK_HANDLE)
-! 
+!
 IF (ASSOCIATED(YNAG%AL)) THEN
   DO JP = 1,KPATCH
     CALL AGRI_INIT(YNAG%AL(JP))

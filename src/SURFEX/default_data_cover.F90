@@ -9,9 +9,9 @@ SUBROUTINE DEFAULT_DATA_COVER(PDATA_TOWN,PDATA_NATURE,PDATA_WATER,PDATA_SEA,&
          PDATA_D_ROOF,PDATA_HC_ROAD,PDATA_TC_ROAD,PDATA_D_ROAD,&
          PDATA_HC_WALL,PDATA_TC_WALL,PDATA_D_WALL,PDATA_H_TRAFFIC,&
          PDATA_LE_TRAFFIC,PDATA_H_INDUSTRY,PDATA_LE_INDUSTRY,&
-         PDATA_VEGTYPE,PDATA_H_TREE,PDATA_WATSUP,PDATA_IRRIG,&
+         PDATA_VEGTYPE,PDATA_H_TREE,PDATA_WATSUP,PDATA_IRRIGTYPE,&
          PDATA_ROOT_DEPTH,PDATA_GROUND_DEPTH,PDATA_DICE,TPDATA_SEED,&
-         TPDATA_REAP)
+         TPDATA_REAP,PDATA_IRRIGTIME,PDATA_IRRIGFRAC,PDATA_IRRIGFREQ,PDATA_F2THRESHOLD)
 !
 USE MODD_TYPE_DATE_SURF  
 USE MODD_SURF_PAR
@@ -51,7 +51,11 @@ REAL, DIMENSION(:), INTENT(INOUT), OPTIONAL :: PDATA_LE_INDUSTRY
 REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_VEGTYPE
 REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_H_TREE
 REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_WATSUP
-REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_IRRIG
+REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_IRRIGTYPE
+REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_IRRIGFRAC
+REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_IRRIGFREQ
+REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_IRRIGTIME
+REAL, DIMENSION(:,:,:), INTENT(INOUT), OPTIONAL :: PDATA_F2THRESHOLD
 REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_ROOT_DEPTH
 REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_GROUND_DEPTH
 REAL, DIMENSION(:,:), INTENT(INOUT), OPTIONAL :: PDATA_DICE
@@ -2209,20 +2213,44 @@ PDATA_H_TREE(:, 19) = (/          &
  XUNDEF,     1.,     1. &
          /)
 ENDIF
-!-------------------------------------------------------------------    
-IF (PRESENT(PDATA_VEGTYPE).AND.PRESENT(PDATA_WATSUP)) THEN                                                
-  WHERE(PDATA_VEGTYPE(:, 8)>0.) PDATA_WATSUP(:,  8) =   0.                                
-!-------------------------------------------------------------------                                                    
-  WHERE(PDATA_VEGTYPE(:, 9)>0.) PDATA_WATSUP(:,  9) =  30.  
-ENDIF                                
-!------------------------------------------------------------------- 
-IF (PRESENT(PDATA_VEGTYPE).AND.PRESENT(PDATA_IRRIG)) THEN                                                    
-  WHERE(PDATA_VEGTYPE(:, 8)>0.) PDATA_IRRIG(:,  8) = 0.00                                   
-!-------------------------------------------------------------------                                                
-  WHERE(PDATA_VEGTYPE(:, 9)>0.) PDATA_IRRIG(:,  9) = 1.00       
-ENDIF                            
 !-------------------------------------------------------------------
-IF (PRESENT(PDATA_ROOT_DEPTH)) THEN                                                    
+IF (PRESENT(PDATA_VEGTYPE).AND.PRESENT(PDATA_IRRIGTYPE)) THEN
+  WHERE(PDATA_VEGTYPE(:, 8)>0.) PDATA_IRRIGTYPE(:,  8) = 0
+!-------------------------------------------------------------------
+  WHERE(PDATA_VEGTYPE(:, 9)>0.) PDATA_IRRIGTYPE(:,  9) = 1
+ENDIF
+!-------------------------------------------------------------------
+IF (PRESENT(PDATA_VEGTYPE).AND.PRESENT(PDATA_WATSUP)) THEN
+  WHERE(PDATA_VEGTYPE(:, 8)>0.) PDATA_WATSUP(:,  8) =   0.
+!-------------------------------------------------------------------
+  WHERE(PDATA_VEGTYPE(:, 9)>0.) PDATA_WATSUP(:,  9) =  30.
+ENDIF         
+!-------------------------------------------------------------------
+IF (PRESENT(PDATA_VEGTYPE).AND.PRESENT(PDATA_IRRIGFRAC)) THEN
+  WHERE(PDATA_VEGTYPE(:, 8)>0.) PDATA_IRRIGFRAC(:,  8) =   0.
+!-------------------------------------------------------------------
+  WHERE(PDATA_VEGTYPE(:, 9)>0.) PDATA_IRRIGFRAC(:,  9) =  1.
+ENDIF
+!------------------------------------------------------------------- 
+IF (PRESENT(PDATA_VEGTYPE).AND.PRESENT(PDATA_IRRIGFREQ)) THEN
+  WHERE(PDATA_VEGTYPE(:, 8)>0.) PDATA_IRRIGFREQ(:,  8) =   0.
+!-------------------------------------------------------------------
+  WHERE(PDATA_VEGTYPE(:, 9)>0.) PDATA_IRRIGFREQ(:,  9) =  604800.
+ENDIF
+!-------------------------------------------------------------------
+IF (PRESENT(PDATA_VEGTYPE).AND.PRESENT(PDATA_IRRIGTIME)) THEN
+  WHERE(PDATA_VEGTYPE(:, 8)>0.) PDATA_IRRIGTIME(:,  8) =   0.
+!-------------------------------------------------------------------
+  WHERE(PDATA_VEGTYPE(:, 9)>0.) PDATA_IRRIGTIME(:,  9) =  28800.
+ENDIF
+!-------------------------------------------------------------------
+IF (PRESENT(PDATA_VEGTYPE).AND.PRESENT(PDATA_WATSUP)) THEN
+  WHERE(PDATA_VEGTYPE(:, 8)>0.) PDATA_WATSUP(:,  8) =   0.
+!-------------------------------------------------------------------
+  WHERE(PDATA_VEGTYPE(:, 9)>0.) PDATA_WATSUP(:,  9) =  30.
+ENDIF
+!-------------------------------------------------------------------
+IF (PRESENT(PDATA_ROOT_DEPTH)) THEN
 PDATA_ROOT_DEPTH(:,  1) = (/          &
  XUNDEF, XUNDEF, XUNDEF,   0.50, XUNDEF, XUNDEF, XUNDEF, XUNDEF,   0.50, XUNDEF, &
  XUNDEF, XUNDEF, XUNDEF, XUNDEF, XUNDEF, XUNDEF, XUNDEF, XUNDEF, XUNDEF, XUNDEF, &

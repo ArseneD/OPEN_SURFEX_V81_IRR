@@ -44,9 +44,11 @@
 !!    MODIFICATIONS
 !!    -------------
 !!      Original    02/2006
-!       S. Riette   06/2010 PSSO_STDEV and PTWSNOW added
-!       B. Decharme 09/2012 Argument added in GET_FLUX_n
-!       B. Decharme 05/2013 Argument added in GET_FLUX_n for debug in ARP/AL/AR
+!!      S. Riette   06/2010 PSSO_STDEV and PTWSNOW added
+!!      B. Decharme 09/2012 Argument added in GET_FLUX_n
+!!      B. Decharme 05/2013 Argument added in GET_FLUX_n for debug in ARP/AL/AR
+!!      A. Druel    02/2019 Transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
@@ -402,7 +404,8 @@ IF ( PRESENT(PQS_NATURE) .OR. PRESENT(PPSNG) .OR. PRESENT(PPSNV) .OR.  PRESENT(P
    !
    IF (PRESENT(PLAI_TREE) .OR. PRESENT(PH_TREE) ) THEN
      !
-     CALL GET_VEG_n(HPROGRAM, KI_NATURE, U, IM%O, IM%S, IM%NP, IM%NPE, ZFIELD1(1:KI_NATURE), ZFIELD2(1:KI_NATURE))
+     CALL GET_VEG_n(HPROGRAM, KI_NATURE, U, IM%O, IM%S, IM%NP, IM%NPE, IM%DTV%NPAR_VEG_IRR_USE, & 
+                    ZFIELD1(1:KI_NATURE), ZFIELD2(1:KI_NATURE))
      !
      IF (PRESENT(PLAI_TREE)) THEN
        PLAI_TREE(:) = XUNDEF

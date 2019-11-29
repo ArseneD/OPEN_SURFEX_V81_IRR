@@ -33,8 +33,9 @@
 !!    ------------
 !!
 !!    Original    11/09/95
+!!    V. Masson,   03/2010  Optimization of some lat/lon boundaries computations
+!!    A. Druel,    02/2019  Add MA1 possibility (without taking into account the zeros)
 !!
-!! V. Masson, March 2010     Optimization of some lat/lon boundaries computations
 !----------------------------------------------------------------------------
 !
 !*    0.     DECLARATION
@@ -230,7 +231,7 @@ IF (LHOOK) CALL DR_HOOK('READ_DIRECT_GAUSS_2',0,ZHOOK_HANDLE)
 !
  CALL READHEAD(IGLBHDR,ZGLBLATMIN,ZGLBLATMAX,ZGLBLONMIN,ZGLBLONMAX, &
                INBLINE,INBCOL,ZNODATA,ZDLAT,ZDLON,ZLAT,ZLON,IERR,IFACT,&
-               GCOMPRESS)  
+               GCOMPRESS)
 IF (IERR/=0) CALL ABOR1_SFX('READ_DIRECT_GAUSS: PB IN FILE HEADER')
 !
 IF (GCOMPRESS .AND. (YTYPE/='INTEGER' .OR. IBITS/=16)) &
@@ -243,7 +244,7 @@ IF (GMULTITYPE) THEN
   DEALLOCATE(NSIZE_ALL)
   ALLOCATE(NSIZE_ALL(U%NDIM_FULL,SUM(NTYPE)))  
   NSIZE_ALL(:,:) = 0
-  IF (CATYPE=='MAJ') THEN
+  IF (CATYPE=='MAJ' .OR. CATYPE=='MA1') THEN
     DEALLOCATE(NVALNBR,NVALCOUNT,XVALLIST)
     ALLOCATE(NVALNBR  (U%NDIM_FULL,SUM(NTYPE)))
     ALLOCATE(NVALCOUNT(U%NDIM_FULL,JPVALMAX,SUM(NTYPE)))
@@ -671,7 +672,7 @@ DO
       IWORK = 0
       !
     ENDIF
-
+    !
   END DO ! JLINE
   !-------------------------------------------------------------------------------
   !

@@ -4,7 +4,7 @@
 !SFX_LIC for details. version 1.
 !     #########
       SUBROUTINE WRITE_DIAG_MISC_ISBA_n (DTCO, HSELECT, OSNOWDIMNC, U, OPATCH_BUDGET, D,  &
-                                         ND, DM, NDM, IO, S, K, NP, TPSNOW, HPROGRAM)
+                                         ND, DM, NDM, IO, S, K, NP, NPE, NAG, TPSNOW, HPROGRAM)
 !     #################################
 !
 !!****  *WRITE_DIAG_MISC_ISBA* - writes the ISBA diagnostic fields
@@ -45,6 +45,7 @@
 !!                           XTSRAD_NAT instead of XAVG_TSRAD
 !!                           delete NWG_SIZE
 !!                           water table depth
+!!      A. Druel     02/2019 for irrigation, add XF2THRESHOLD (and NPE), NIRRINUM (and NAG) and remove XSEUIL
 !!
 !-------------------------------------------------------------------------------
 !
@@ -53,20 +54,22 @@
 !
 USE MODD_TYPE_SNOW
 !
-USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
-USE MODD_SURF_ATM_n, ONLY : SURF_ATM_t
-USE MODD_DIAG_n, ONLY : DIAG_t, DIAG_NP_t
+USE MODD_DATA_COVER_n,     ONLY : DATA_COVER_t
+USE MODD_SURF_ATM_n,       ONLY : SURF_ATM_t
+USE MODD_DIAG_n,           ONLY : DIAG_t, DIAG_NP_t
 USE MODD_DIAG_MISC_ISBA_n, ONLY : DIAG_MISC_ISBA_t, DIAG_MISC_ISBA_NP_t
-USE MODD_ISBA_OPTIONS_n, ONLY : ISBA_OPTIONS_t
-USE MODD_ISBA_n, ONLY : ISBA_S_t, ISBA_K_t, ISBA_NP_t
+USE MODD_ISBA_OPTIONS_n,   ONLY : ISBA_OPTIONS_t
+USE MODD_ISBA_n,           ONLY : ISBA_S_t, ISBA_K_t, ISBA_NP_t, ISBA_NPE_t
+USE MODD_AGRI_n,           ONLY : AGRI_NP_t
 !
-USE MODD_XIOS, ONLY : LALLOW_ADD_DIM
+USE MODD_XIOS,             ONLY : LALLOW_ADD_DIM
 !
-USE MODD_SURF_PAR,        ONLY :   NUNDEF, XUNDEF
+USE MODD_SURF_PAR,         ONLY : NUNDEF, XUNDEF
 !
-USE MODD_ASSIM, ONLY : LASSIM, CASSIM_ISBA, NVAR, CVAR, NOBSTYPE, NBOUTPUT, COBS
+USE MODD_ASSIM,            ONLY : LASSIM, CASSIM_ISBA, NVAR, CVAR, NOBSTYPE, NBOUTPUT, COBS
 !                                 
-USE MODD_AGRI,            ONLY :   LAGRIP
+USE MODD_AGRI,             ONLY : LAGRIP, LIRRIGMODE, XTHRESHOLD
+
 !
 USE MODI_INIT_IO_SURF_n
 USE MODI_WRITE_SURF
@@ -83,28 +86,30 @@ IMPLICIT NONE
 !              -------------------------
 !
 !
-TYPE(DATA_COVER_t), INTENT(INOUT) :: DTCO
+TYPE(DATA_COVER_t),        INTENT(INOUT) :: DTCO
  CHARACTER(LEN=*), DIMENSION(:), INTENT(IN) :: HSELECT
-LOGICAL, INTENT(IN) :: OSNOWDIMNC
-TYPE(SURF_ATM_t), INTENT(INOUT) :: U
-LOGICAL, INTENT(IN) :: OPATCH_BUDGET
-TYPE(DIAG_t), INTENT(INOUT) :: D
-TYPE(DIAG_NP_t), INTENT(INOUT) :: ND
-TYPE(DIAG_MISC_ISBA_t), INTENT(INOUT) :: DM
+LOGICAL,                   INTENT(IN)    :: OSNOWDIMNC
+TYPE(SURF_ATM_t),          INTENT(INOUT) :: U
+LOGICAL,                   INTENT(IN)    :: OPATCH_BUDGET
+TYPE(DIAG_t),              INTENT(INOUT) :: D
+TYPE(DIAG_NP_t),           INTENT(INOUT) :: ND
+TYPE(DIAG_MISC_ISBA_t),    INTENT(INOUT) :: DM
 TYPE(DIAG_MISC_ISBA_NP_t), INTENT(INOUT) :: NDM
-TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
-TYPE(ISBA_S_t), INTENT(INOUT) :: S
-TYPE(ISBA_K_t), INTENT(INOUT) :: K
-TYPE(ISBA_NP_t), INTENT(INOUT) :: NP
-TYPE(SURF_SNOW), INTENT(IN) :: TPSNOW
+TYPE(ISBA_OPTIONS_t),      INTENT(INOUT) :: IO
+TYPE(ISBA_S_t),            INTENT(INOUT) :: S
+TYPE(ISBA_K_t),            INTENT(INOUT) :: K
+TYPE(ISBA_NP_t),           INTENT(INOUT) :: NP
+TYPE(ISBA_NPE_t),          INTENT(INOUT) :: NPE
+TYPE(AGRI_NP_t),           INTENT(INOUT) :: NAG
+TYPE(SURF_SNOW),           INTENT(IN)    :: TPSNOW
 !
- CHARACTER(LEN=6),  INTENT(IN)  :: HPROGRAM ! program calling
+ CHARACTER(LEN=6),  INTENT(IN)           :: HPROGRAM ! program calling
 !
 !*       0.2   Declarations of local variables
 !              -------------------------------
 !
-INTEGER           :: IRESP          ! IRESP  : return-code if a problem appears
- CHARACTER(LEN=1) :: YVAR, YOBS, YTIM
+INTEGER            :: IRESP          ! IRESP  : return-code if a problem appears
+ CHARACTER(LEN=1)  :: YVAR, YOBS, YTIM
  CHARACTER(LEN=12) :: YRECFM         ! Name of the article to be read
  CHARACTER(LEN=100):: YCOMMENT       ! Comment string
  CHARACTER(LEN=2)  :: YLVL
@@ -112,6 +117,7 @@ INTEGER           :: IRESP          ! IRESP  : return-code if a problem appears
 !
 REAL, DIMENSION(SIZE(DM%XSWI,1)) :: ZMAX
 INTEGER           :: JL, JJ, JVAR, JOBS, JP, JI, JT, JK, ISIZE
+REAL, DIMENSION(:), ALLOCATABLE :: ZWORK
 !
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
@@ -759,17 +765,33 @@ IF (DM%LSURF_MISC_BUDGET) THEN
     !
   ENDIF
   !
-  IF (LAGRIP) THEN
-    !
-    !        2.8    Irrigation threshold
-    !               --------------------
+  !        3.7    Irrigation output
+  !               -----------------
+  !
+  IF (LIRRIGMODE) THEN
     !
     YRECFM='IRRISEUIL'
     YCOMMENT='irrigation threshold per patch'
     DO JP=1,IO%NPATCH
+      ALLOCATE(ZWORK(SIZE(NPE%AL(JP)%XF2THRESHOLD(:),1)))
+      ZWORK(:)=NPE%AL(JP)%XF2THRESHOLD(:)
+      WHERE ( ABS( (ZWORK(:)/XUNDEF) - 1 ) <= 1.E-5)
+        ZWORK(:) = XTHRESHOLD(MIN(NAG%AL(JP)%NIRRINUM(:),SIZE(XTHRESHOLD,1)))
+      ENDWHERE
       CALL WRITE_FIELD_1D_PATCH(HSELECT,HPROGRAM,YRECFM,YCOMMENT,JP,&
-          NP%AL(JP)%NR_P,NDM%AL(JP)%XSEUIL(:),ISIZE,S%XWORK_WR)
-    ENDDO    
+            NP%AL(JP)%NR_P,ZWORK(:),ISIZE,S%XWORK_WR)
+      DEALLOCATE(ZWORK)
+    ENDDO
+    !
+    YRECFM='IRRIG_NUM'
+    YCOMMENT='irrigation number (for the season)'
+    DO JP=1,IO%NPATCH
+      ALLOCATE(ZWORK(SIZE(NAG%AL(JP)%NIRRINUM(:),1)))
+      ZWORK(:)=NAG%AL(JP)%NIRRINUM(:)-1
+      CALL WRITE_FIELD_1D_PATCH(HSELECT,HPROGRAM,YRECFM,YCOMMENT,JP,&
+            NP%AL(JP)%NR_P,ZWORK(:),ISIZE,S%XWORK_WR)
+      DEALLOCATE(ZWORK)
+    ENDDO
     !
   ENDIF
   !

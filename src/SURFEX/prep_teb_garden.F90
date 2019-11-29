@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-SUBROUTINE PREP_TEB_GARDEN (DTCO, UG, U, USS, GCP, TG, TOP, IO, S, K, P, PEK, &
+SUBROUTINE PREP_TEB_GARDEN (DTCO, UG, U, USS, GCP, TG, TOP, IO, S, K, P, PEK, NPAR_VEG_IRR_USE, &
                             HPROGRAM,HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,KPATCH,YDCTL)
 !     #################################################################################
 !
@@ -33,6 +33,8 @@ SUBROUTINE PREP_TEB_GARDEN (DTCO, UG, U, USS, GCP, TG, TOP, IO, S, K, P, PEK, &
 !!      Modified by B. Decharme  (03/2009): Consistency with Arpege permanent
 !!                                          snow/ice treatment
 !!      P. Marguinaud10/2014, Support for a 2-part PREP
+!!      A. Druel     02/2019, Transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !!------------------------------------------------------------------
 !
 !
@@ -93,6 +95,7 @@ TYPE(ISBA_PE_t), INTENT(INOUT) :: PEK
 !
 TYPE (PREP_CTL),    INTENT(INOUT) :: YDCTL
 !
+INTEGER,DIMENSION(:),INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
  CHARACTER(LEN=6),   INTENT(IN)  :: HPROGRAM  ! program calling surf. schemes
  CHARACTER(LEN=28),  INTENT(IN)  :: HATMFILE    ! name of the Atmospheric file
  CHARACTER(LEN=6),   INTENT(IN)  :: HATMFILETYPE! type of the Atmospheric file
@@ -120,34 +123,34 @@ REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !*      2.1    Soil Water reservoirs
 !
 IF (LHOOK) CALL DR_HOOK('PREP_TEB_GARDEN',0,ZHOOK_HANDLE)
- CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, &
+ CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, NPAR_VEG_IRR_USE, &
                                 HPROGRAM,'WG     ',HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,KPATCH,YDCTL)
 !
 !*      2.2    Soil ice reservoirs
 !
- CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, &         
+ CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, NPAR_VEG_IRR_USE, &         
                                 HPROGRAM,'WGI    ',HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,KPATCH,YDCTL)
 !
 !*      2.3    Leaves interception water reservoir
 !
- CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, &
+ CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, NPAR_VEG_IRR_USE, &
                                 HPROGRAM,'WR     ',HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,KPATCH,YDCTL)
 !
 !*      2.4    Temperature profile
 !
- CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, &
+ CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, NPAR_VEG_IRR_USE, &
                                 HPROGRAM,'TG     ',HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,KPATCH,YDCTL)
 !
 !*      2.5    Snow variables
 !
- CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, &
+ CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, NPAR_VEG_IRR_USE, &
                                 HPROGRAM,'SN_VEG ',HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,KPATCH,YDCTL)
 
 !
 !*      2.6    LAI
 !
 IF (IO%CPHOTO/='NON')  &
- CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, &
+ CALL PREP_HOR_TEB_GARDEN_FIELD(DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP, NPAR_VEG_IRR_USE, &
                                 HPROGRAM,'LAI    ',HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,KPATCH,YDCTL)
 !
 !-------------------------------------------------------------------------------------

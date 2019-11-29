@@ -3,10 +3,10 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-      SUBROUTINE HYDRO(IO, KK, PK, PEK, AG, DEK, DMK, OMEB, PTSTEP, PVEG, &
-                       PWRMAX, PSNOW_THRUFAL, PEVAPCOR, PSUBVCOR, PSOILHCAPZ, &
-                       PF2WGHT, PF2, PPS, PIRRIG_GR, PDELHEATG, PDELHEATG_SFC,&
-                       PDELPHASEG, PDELPHASEG_SFC               )
+      SUBROUTINE HYDRO(IO, KK, PK, PEK, AG, DEK, DMK, OMEB, PTSTEP, PVEG,      &
+                       PWRMAX, PSNOW_THRUFAL, PEVAPCOR, PSUBVCOR, PSOILHCAPZ,  &
+                       PF2WGHT, PF2, PPS, PIRRIG_GR, PDELHEATG, PDELHEATG_SFC, &
+                       PDELPHASEG, PDELPHASEG_SFC, NPAR_VEG_IRR_USE)
 !     #####################################################################
 !
 !!****  *HYDRO*  
@@ -72,8 +72,12 @@
 !!                                         water table / surface coupling
 !!                  02/2013  (C. de Munck) specified irrigation rate of ground added
 !!                  10/2014  (A. Boone)    MEB added
-!!                  07/15    (B. Decharme) Numerical adjustement for F2 soilstress function
-!!                  03/16    (B. Decharme) Limit flood infiltration
+!!                  07/2015  (B. Decharme) Numerical adjustement for F2 soilstress function
+!!                  03/2016  (B. Decharme) Limit flood infiltration
+!!                  01/2018  (J.Etchanchu) Different types of irrigation taken into account
+!!                  02/2019  (A. Druel)    Adapt the code to be compatible with new irrigation version (new patches)
+!!                                          and remove the old version
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.     DECLARATIONS
@@ -84,8 +88,9 @@ USE MODD_ISBA_n, ONLY : ISBA_K_t, ISBA_P_t, ISBA_PE_t
 USE MODD_AGRI_n, ONLY : AGRI_t
 USE MODD_DIAG_EVAP_ISBA_n, ONLY : DIAG_EVAP_ISBA_t
 USE MODD_DIAG_MISC_ISBA_n, ONLY : DIAG_MISC_ISBA_t
+USE MODD_AGRI,      ONLY : LIRRIGMODE 
 !
-USE MODD_CSTS,      ONLY : XRHOLW, XDAY, XTT, XLSTT, XLMTT
+USE MODD_CSTS,      ONLY : XRHOLW, XTT, XLSTT, XLMTT !, XDAY
 USE MODD_ISBA_PAR,  ONLY : XWGMIN, XDENOM_MIN
 USE MODD_SURF_PAR,  ONLY : XUNDEF, NUNDEF
 !
@@ -105,6 +110,7 @@ USE MODE_THERMOS
 !
 USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 USE PARKIND1  ,ONLY : JPRB
+USE MODN_IO_OFFLINE ,ONLY : XTSTEP_SURF    ! time step of the surface
 !
 IMPLICIT NONE
 !
@@ -119,9 +125,9 @@ TYPE(AGRI_t), INTENT(INOUT) :: AG
 TYPE(DIAG_EVAP_ISBA_t), INTENT(INOUT) :: DEK
 TYPE(DIAG_MISC_ISBA_t), INTENT(INOUT) :: DMK
 !
-LOGICAL, INTENT(IN)                :: OMEB   ! True  = patch with multi-energy balance 
+LOGICAL, INTENT(IN)               :: OMEB   ! True  = patch with multi-energy balance 
 !                                            ! False = patch with classical (composite) ISBA
-REAL, INTENT(IN)                    :: PTSTEP
+REAL, INTENT(IN)                  :: PTSTEP
 !                                      timestep of the integration
 !
 REAL, DIMENSION(:), INTENT(IN)    :: PVEG, PWRMAX
@@ -145,7 +151,7 @@ REAL, DIMENSION(:), INTENT(IN)    :: PPS, PF2
 REAL, DIMENSION(:,:), INTENT(IN)  :: PF2WGHT
 !                                    PF2WGHT   = water stress factor (profile) (-)
 !
-REAL, DIMENSION(:,:), INTENT(IN) :: PSOILHCAPZ
+REAL, DIMENSION(:,:), INTENT(IN)  :: PSOILHCAPZ
 !                                   PSOILHCAPZ = ISBA-DF Soil heat capacity profile [J/(m3 K)]
 !
 REAL, DIMENSION(:), INTENT(INOUT) :: PDELHEATG, PDELHEATG_SFC
@@ -156,7 +162,9 @@ REAL, DIMENSION(:), INTENT(OUT)   :: PDELPHASEG, PDELPHASEG_SFC
 !                                     PDELPHASEG     = latent heating due to soil freeze-thaw in the entire soil column  (W m-2)
 !                                     PDELPHASEG_SFC = latent heating due to soil freeze-thaw in the surface soil layer  (W m-2)
 !
-REAL   ,DIMENSION(:),INTENT(IN)    :: PIRRIG_GR ! ground irrigation rate (kg/m2/s)
+REAL, DIMENSION(:),INTENT(IN)     :: PIRRIG_GR ! ground irrigation rate (kg/m2/s)
+!
+INTEGER, DIMENSION(:), INTENT(IN) :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 !*      0.2    declarations of local variables
 !
@@ -322,39 +330,46 @@ END IF
 !*       1.     EVOLUTION OF THE EQUIVALENT WATER CONTENT Wr
 !               --------------------------------------------
 !
-!
-!
 IF(.NOT.OMEB)THEN ! Canopy Int & Irrig Already accounted for if MEB in use.
-!
-   DEK%XIRRIG_FLUX(:)=0.0
-!
-!* add irrigation over vegetation to liquid precipitation (rr)
-!
-!
-   IF (ASSOCIATED(AG%LIRRIGATE)) THEN
-     IF (SIZE(AG%LIRRIGATE)>0) THEN
-       WHERE (AG%LIRRIGATE(:) .AND. PEK%XIRRIG(:)>0. .AND. PEK%XIRRIG(:) /= XUNDEF .AND. (PF2(:)<AG%XTHRESHOLDSPT(:)) )
-         DEK%XIRRIG_FLUX(:) = PEK%XWATSUP(:) / XDAY           
-         ZRR   (:) = ZRR(:) + PEK%XWATSUP(:) / XDAY
-         AG%LIRRIDAY(:)    = .TRUE.           
-       END WHERE
-     ENDIF
-   ENDIF
-!
-!* interception reservoir and dripping computation
-!
-   CALL HYDRO_VEG(IO%CRAIN, PTSTEP, KK%XMUF, ZRR, ZLEV, ZLETR, PVEG, &
-                  ZPSNV,  PEK%XWR(:), PWRMAX, ZPG, DEK%XDRIP, DEK%XRRVEG, PK%XLVTT  ) 
-!
+  !
+  DEK%XIRRIG_FLUX(:)=0.0
+  !
+  !* add irrigation
+  ! Spraying irrigation - over vegetation to liquid precipitation (rr)
+  IF (LIRRIGMODE) THEN 
+    IF (SIZE(AG%LIRRIGATE)>0) THEN
+      WHERE (AG%LIRRIGATE(:) .AND. PEK%XIRRIGTYPE(:) == 1 )
+        DEK%XIRRIG_FLUX(:) = PEK%XWATSUP / PEK%XIRRIGTIME(:)
+        ZRR   (:) = ZRR(:) + PEK%XWATSUP(:) / PEK%XIRRIGTIME(:)
+      ENDWHERE
+    ENDIF
+  ENDIF
+  !
+  !* interception reservoir and dripping computation
+  !
+  CALL HYDRO_VEG(IO%CRAIN, PTSTEP, KK%XMUF, ZRR, ZLEV, ZLETR, PVEG, &
+                 ZPSNV,  PEK%XWR(:), PWRMAX, ZPG, DEK%XDRIP, DEK%XRRVEG, PK%XLVTT  ) 
+  !
 ELSE
+  !
+  ! For MEB case, interception interactions already computed and DMK%XRRSFC represents
+  !  water falling (drip and not intercepted by vegetation) outside of snow covered
+  ! areas. Part for snow covered areas (net outflow at base of snowpack) accounted
+  ! for in PSNOW_THRUFAL.
+  !
+  ZPG(:) = DMK%XRRSFC(:)
+  !
+ENDIF
 !
-! For MEB case, interception interactions already computed and DMK%XRRSFC represents
-! water falling (drip and not intercepted by vegetation) outside of snow covered
-! areas. Part for snow covered areas (net outflow at base of snowpack) accounted
-! for in PSNOW_THRUFAL.
-!
-   ZPG(:) = DMK%XRRSFC(:)
-!
+!* add irrigation
+! Dripping and flooding irrigationi - over soil (zpg)
+IF (LIRRIGMODE) THEN
+  IF (SIZE(AG%LIRRIGATE)>0) THEN
+    WHERE (AG%LIRRIGATE(:) .AND. PEK%XIRRIGTYPE(:) > 1 )
+      DEK%XIRRIG_FLUX(:) = PEK%XWATSUP / PEK%XIRRIGTIME(:)
+      ZPG   (:) = ZPG(:) + PEK%XWATSUP(:) / PEK%XIRRIGTIME(:)
+    ENDWHERE
+  ENDIF
 ENDIF
 !
 !* add irrigation over ground to potential soil infiltration (pg)
@@ -388,7 +403,7 @@ IF(PEK%TSNOW%SCHEME == '3-L' .OR. PEK%TSNOW%SCHEME == 'CRO' .OR. IO%CISBA == 'DI
 ELSE
   !
   CALL HYDRO_SNOW(IO%LGLACIER, PTSTEP, PK%XVEGTYPE_PATCH(:,:), DMK%XSRSFC, &
-                  DEK%XLES, DEK%XMELT, PEK%TSNOW, ZPG_MELT)
+                  DEK%XLES, DEK%XMELT, PEK%TSNOW, ZPG_MELT, NPAR_VEG_IRR_USE)
   !
 ENDIF
 !
@@ -543,7 +558,7 @@ ELSE
 !
 #ifdef TOPD
   IF (LCOUPL_TOPD) THEN
-    !runoff topo cumule (kg/m²)
+    !runoff topo cumule (kg/mÂ²)
     DO JJ=1,SIZE(NMASKT_PATCH)
       IF  (NMASKT_PATCH(JJ)/=0) THEN
         IF ( XATOP(NMASKT_PATCH(JJ))/=XUNDEF) THEN

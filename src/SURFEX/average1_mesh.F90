@@ -34,6 +34,7 @@
 !!    ------------
 !!
 !!    Original    12/09/95
+!!                02/2019   A. Druel - Add MA1 and ARV possibilities (without taking into account the zeros)
 !!
 !----------------------------------------------------------------------------
 !
@@ -106,7 +107,7 @@ IF (.NOT.PRESENT(PNODATA)) ZVALUE(:) = PVALUE(:)
 !
 !*    2.     Loop on all input data points
 !            -----------------------------
-! 
+!
 DO JOV = 1, NOVMX
   !
   bloop: &
@@ -144,14 +145,26 @@ DO JOV = 1, NOVMX
       CASE ('ARI')
         XALL(IDX,JTY,1) = XALL(IDX,JTY,1) +   ZVALUE(JL)
 
+!! Next lines not use but can be usefull (define like 'ARV')
+!      CASE ('AR1') ! To count fraction of points un a grid cell with "1"
+!        IF (ABS( 1. - ZVALUE(JL)) < ZEPS) XALL(IDX,JTY,1) = XALL(IDX,JTY,1) +   1
+!
+!      CASE ('AR2') ! To count fraction of points un a grid cell with "2"
+!        IF (ABS( 2. - ZVALUE(JL)) < ZEPS) XALL(IDX,JTY,1) = XALL(IDX,JTY,1) +   1
+!
+!      CASE ('AR3') ! To count fraction of points un a grid cell with "3"
+!        IF (ABS( 3. - ZVALUE(JL)) < ZEPS) XALL(IDX,JTY,1) = XALL(IDX,JTY,1) +   1
+
+      CASE ('ARV') ! To count fraction of points un a grid cell with a value (>0)
+        IF ( ZVALUE(JL) > ZEPS ) XALL(IDX,JTY,1) = XALL(IDX,JTY,1) +   1
+
       CASE ('INV')
         XALL(IDX,JTY,1) = XALL(IDX,JTY,1) + 1./ZVALUE(JL)
 
       CASE ('CDN')
         XALL(IDX,JTY,1) = XALL(IDX,JTY,1) + 1./(LOG(XCDREF/ZVALUE(JL)))**2
 
-      CASE ('MAJ')
-
+      CASE ('MAJ','MA1')
         GFOUND=.FALSE.
         DO JVAL=1,NVALNBR(IDX,JTY)
           IF (ABS( XVALLIST(IDX,JVAL,JTY) - ZVALUE(JL)) < ZEPS) THEN
@@ -169,6 +182,9 @@ DO JOV = 1, NOVMX
           NVALCOUNT(IDX,JVAL,JTY) = 1
           XVALLIST (IDX,JVAL,JTY) = ZVALUE(JL)
         END IF
+
+      CASE DEFAULT
+        CALL ABOR1_SFX('CASE CATYPE NOT DEFINE ! CATYPE = '//CATYPE)
 
     END SELECT
     !

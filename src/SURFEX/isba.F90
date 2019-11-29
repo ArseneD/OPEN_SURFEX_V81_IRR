@@ -12,7 +12,7 @@
                       PPALPHAN, PZ0G_WITHOUT_SNOW, PZ0_MEBV, PZ0H_MEBV,          &
                       PZ0EFF_MEBV, PZ0_MEBN, PZ0H_MEBN, PZ0EFF_MEBN, PTDEEP_A,   &
                       PCSP, PFFG_NOSNOW, PFFV_NOSNOW, PEMIST, PUSTAR, PAC_AGG,   &
-                      PHU_AGG, PRESP_BIOMASS_INST, PDEEP_FLUX, PIRRIG_GR     )
+                      PHU_AGG, PRESP_BIOMASS_INST, PDEEP_FLUX, PIRRIG_GR,NPAR_VEG_IRR_USE)
 !     ##########################################################################
 !
 !
@@ -98,7 +98,10 @@
 !!      (A. Boone & P. Samuelsson) (10/2014) Added MEB v1
 !!      (P. LeMoigne) 12/2014 EBA scheme update
 !!      (A. Boone)    02/2015 Consider spectral band dependence of snow for IO%LTR_ML radiation option
-!!      B. Decharme    01/16 : Bug with flood budget
+!!      B. Decharme   01/2016 Bug with flood budget
+!!      J.Etchanchu   01/2018 Add irrigation decision rules
+!!      A. Druel      02/2019 Adapt the code to be compatible with irrigation (and new patches)
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.     DECLARATIONS
@@ -111,6 +114,7 @@ USE MODD_AGRI_n, ONLY : AGRI_t
 USE MODD_DIAG_n, ONLY : DIAG_t
 USE MODD_DIAG_EVAP_ISBA_n, ONLY : DIAG_EVAP_ISBA_t
 USE MODD_DIAG_MISC_ISBA_n, ONLY : DIAG_MISC_ISBA_t
+USE MODD_AGRI,           ONLY : LIRRIGMODE
 !
 USE MODD_CO2V_PAR,   ONLY : XMC, XMCO2, XPCCO2
 USE MODD_SURF_PAR,   ONLY : XUNDEF
@@ -118,7 +122,6 @@ USE MODD_SURF_PAR,   ONLY : XUNDEF
 USE MODD_CSTS,           ONLY : XTT
 USE MODD_CO2V_PAR,       ONLY : XMC, XMCO2, XPCCO2
 USE MODD_SURF_PAR,       ONLY : XUNDEF
-USE MODD_DATA_COVER_PAR, ONLY : NVT_SNOW
 USE MODD_MEB_PAR,        ONLY : XSW_WGHT_VIS, XSW_WGHT_NIR
 !
 USE MODD_TYPE_DATE_SURF, ONLY : DATE_TIME
@@ -134,7 +137,7 @@ USE MODI_ISBA_SNOW_AGR
 !
 USE MODI_RADIATIVE_TRANSFERT
 USE MODI_COTWORES
-!
+USE MODI_IRRIGATION_TRIGGER
 !
 USE MODI_ISBA_CEB
 USE MODI_ISBA_MEB
@@ -287,9 +290,14 @@ REAL, DIMENSION(:,:),   INTENT(OUT) :: PRESP_BIOMASS_INST  ! instantaneous bioma
 !* diagnostic variables for multi-energy balance (MEB)
 !  ---------------------------------------------------
 !
-REAL, DIMENSION(:),     INTENT(OUT) :: PDEEP_FLUX ! Heat flux at bottom of ISBA (W/m2)
+REAL, DIMENSION(:),     INTENT(OUT) :: PDEEP_FLUX       ! Heat flux at bottom of ISBA (W/m2)
 !
-REAL   ,DIMENSION(:),INTENT(IN)    :: PIRRIG_GR ! ground irrigation rate (kg/m2/s)
+REAL   ,DIMENSION(:),INTENT(IN)     :: PIRRIG_GR        ! ground irrigation rate (kg/m2/s)
+!
+!* Liste of vegtype irrigate
+!  -------------------------
+!
+INTEGER,DIMENSION(:), INTENT(IN)    :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 !
 !*      0.2    declarations of local variables
@@ -477,7 +485,7 @@ IF(OMEB)THEN
                  PZREF, PUREF, PZ0G_WITHOUT_SNOW, PZ0_MEBV, PZ0H_MEBV,&
                  PZ0EFF_MEBV, PZ0_MEBN, PZ0H_MEBN, PZ0EFF_MEBN,       & 
                  PALBNIR_TVEG, PALBVIS_TVEG,PALBNIR_TSOIL, PALBVIS_TSOIL, &
-                 PABC, PIACAN, PPOI, PCSP, PRESP_BIOMASS_INST,  PPALPHAN, &
+                 PABC, PIACAN, PPOI, NPAR_VEG_IRR_USE, PCSP, PRESP_BIOMASS_INST,  PPALPHAN, &
                  ZF2, PLW_RAD, ZGRNDFLUX, ZFLSN_COR, PUSTAR, ZEMIST,      &
                  PHU_AGG, PAC_AGG, ZDELHEATV_SFC, ZDELHEATG_SFC, ZDELHEATG, &
                  ZDELHEATN, ZDELHEATN_SFC, ZGSFCSNOW, PTDEEP_A, PDEEP_FLUX, &
@@ -492,12 +500,12 @@ ELSE
 !              -------------------
 !
   IF (IO%LTR_ML) THEN
-    CALL RADIATIVE_TRANSFERT(IO%LAGRI_TO_GRASS, PK%XVEGTYPE_PATCH, PALBVIS_TVEG,   &
-                             PALBVIS_TSOIL, PALBNIR_TVEG, PALBNIR_TSOIL, PSW_RAD,  &
-                             PEK%XLAI, PZENITH, PABC, PEK%XFAPARC, PEK%XFAPIRC,    &
+    CALL RADIATIVE_TRANSFERT(IO%LAGRI_TO_GRASS, PK%XVEGTYPE_PATCH, PALBVIS_TVEG,    &
+                             PALBVIS_TSOIL, PALBNIR_TVEG, PALBNIR_TSOIL, PSW_RAD,   &
+                             PEK%XLAI, PZENITH, PABC, PEK%XFAPARC, PEK%XFAPIRC,     &
                              PEK%XMUS, PEK%XLAI_EFFC, GSHADE, PIACAN, ZIACAN_SUNLIT,&
-                             ZIACAN_SHADE, ZFRAC_SUN, DMK%XFAPAR, DMK%XFAPIR,     &
-                             DMK%XFAPAR_BS, DMK%XFAPIR_BS  )
+                             ZIACAN_SHADE, ZFRAC_SUN, DMK%XFAPAR, DMK%XFAPIR,       &
+                             DMK%XFAPAR_BS, DMK%XFAPIR_BS, NPAR_VEG_IRR_USE  )
    ENDIF
 !
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
@@ -517,9 +525,9 @@ ELSE
                     ZSOILCONDZ(:,1), PPS, PTA, PSW_RAD, PQA, PVMOD, PLW_RAD, PRR,         &
                     PSR, PRHOA, PUREF, PEXNS, PEXNA, PDIRCOSZW, PZREF, PEK%XSNOWFREE_ALB, &
                     PK%XDG, PK%XDZG, PPEW_A_COEF, PPEW_B_COEF, PPET_A_COEF, PPEQ_A_COEF,  &
-                    PPET_B_COEF, PPEQ_B_COEF, ZSNOW_THRUFAL_SOIL, ZGRNDFLUX, ZFLSN_COR,    &
+                    PPET_B_COEF, PPEQ_B_COEF, ZSNOW_THRUFAL_SOIL, ZGRNDFLUX, ZFLSN_COR,   &
                     ZGSFCSNOW, ZEVAPCOR, ZLES3L, ZLEL3L, ZEVAP3L, ZSNOWSFCH, ZDELHEATN,   &
-                    ZDELHEATN_SFC, ZRI3L, PZENITH, ZDELHEATG, ZDELHEATG_SFC, ZQS3L      )  
+                    ZDELHEATN_SFC, ZRI3L, PZENITH, ZDELHEATG, ZDELHEATG_SFC, ZQS3L, NPAR_VEG_IRR_USE)
 !  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 !
 !*      8.0    Plant stress, stomatal resistance and, possibly, CO2 assimilation
@@ -529,10 +537,10 @@ ELSE
       CALL VEG(PSW_RAD, PTA, PQA, PPS, PEK%XRGL, PEK%XLAI, PEK%XRSMIN, PEK%XGAMMA, ZF2, DMK%XRS)
    ELSE IF (MAXVAL(PEK%XGMES(:)).NE.XUNDEF .OR. MINVAL(PEK%XGMES(:)).NE.XUNDEF) THEN
       ZQSAT(:)=QSAT(PEK%XTG(:,1),PPS(:))  
-      CALL COTWORES(PTSTEP, IO, GSHADE, PK, PEK, PK%XDMAX, PPOI, PCSP, PEK%XTG(:,1), &
-                    ZF2, PSW_RAD, PQA, ZQSAT, PEK%XPSNV, ZDELTA, PRHOA, PZENITH,     &
-                    KK%XFFV, ZIACAN_SUNLIT, ZIACAN_SHADE, ZFRAC_SUN, PIACAN, PABC,   &
-                    DMK%XRS, DEK%XGPP, PRESP_BIOMASS_INST(:,1))
+      CALL COTWORES(PTSTEP, IO, GSHADE, PK, PEK, PK%XDMAX, PPOI, PCSP, PEK%XTG(:,1),  &
+                    ZF2, PSW_RAD, PQA, ZQSAT, PEK%XPSNV, ZDELTA, PRHOA, PZENITH,      &
+                    KK%XFFV, NPAR_VEG_IRR_USE, ZIACAN_SUNLIT, ZIACAN_SHADE, ZFRAC_SUN,&
+                    PIACAN, PABC, DMK%XRS, DEK%XGPP, PRESP_BIOMASS_INST(:,1))
    ELSE
       PRESP_BIOMASS_INST(:,1) = 0.0
       DEK%XGPP(:) = 0.0
@@ -565,6 +573,15 @@ ENDIF
 !                                      DEK%XLER, DEK%XLETR, PEVAP, PUSTAR, PGFLUX
 !*******************************************************************************
 !
+!*     10.0    Irrigation decision rules 
+!              -------------------------
+!
+IF ( LIRRIGMODE .AND. ANY(PEK%XIRRIGTYPE /= 0 )) THEN 
+  CALL IRRIGATION_TRIGGER(AG, PEK, ZF2, PTSTEP, TPTIME)
+ELSE
+  AG%LIRRIGATE = .FALSE. 
+ENDIF
+!
 !*     12.0    Water transfers and phase change in the soil
 !              --------------------------------------------
 !
@@ -572,7 +589,7 @@ CALL HYDRO(IO, KK, PK, PEK, AG, DEK, DMK,                      &
            OMEB, PTSTEP, ZVEG, ZWRMAX, ZSNOW_THRUFAL_SOIL,     &
            ZEVAPCOR, ZSUBVCOR, ZSOILHCAPZ, ZF2WGHT, ZF2, PPS,  &
            PIRRIG_GR, ZDELHEATG, ZDELHEATG_SFC,  ZDELPHASEG,   &
-           ZDELPHASEG_SFC                                )
+           ZDELPHASEG_SFC, NPAR_VEG_IRR_USE )
 !-------------------------------------------------------------------------------
 !
 !*     13.0    Aggregated output fluxes and diagnostics

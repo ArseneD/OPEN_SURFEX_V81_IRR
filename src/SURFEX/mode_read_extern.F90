@@ -30,9 +30,9 @@ CONTAINS
 !---------------------------------------------------------------------------------------
 !
 !     #######################
-      SUBROUTINE READ_EXTERN_DEPTH (U, DTCO, GCP, IO, &
+      SUBROUTINE READ_EXTERN_DEPTH (U, DTCO, GCP, IO, NPAR_VEG_IRR_USE,   &
                                     HFILE,HFILETYPE,HFILEPGD,HFILEPGDTYPE,&
-                                    KLUOUT,HISBA,HNAT,HFIELD,KNI,KLAYER, &
+                                    KLUOUT,HISBA,HNAT,HFIELD,KNI,KLAYER,  &
                                    KPATCH,PSOILGRID,PDEPTH,KVERSION,KWG_LAYER          )
 !     #######################
 !
@@ -55,7 +55,8 @@ USE MODI_READ_ARRANGE_COVER
 !
 ! Modifications :
 ! P.Marguinaud : 11-09-2012 : shorten field name
-! G.Delautier : 24-06-2015 : bug for arome compressed files
+! G.Delautier  : 24-06-2015 : bug for arome compressed files
+! A.Druel      :    02-2019 : add NPAR_VEG_IRR_USE and ECOSG for irrigation
 !
 IMPLICIT NONE
 !
@@ -68,10 +69,11 @@ TYPE(GRID_CONF_PROJ_t),INTENT(INOUT) :: GCP
 TYPE(DATA_COVER_t), INTENT(INOUT) :: DTCO
 TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
 !
- CHARACTER(LEN=28),    INTENT(IN)    :: HFILE  ! type of input file
- CHARACTER(LEN=6),     INTENT(IN)    :: HFILETYPE  ! type of input file
- CHARACTER(LEN=28),    INTENT(IN)    :: HFILEPGD  ! type of input file
- CHARACTER(LEN=6),     INTENT(IN)    :: HFILEPGDTYPE  ! type of input file
+INTEGER,DIMENSION(:), INTENT(IN)    :: NPAR_VEG_IRR_USE ! vegtype with irrigation
+ CHARACTER(LEN=28),   INTENT(IN)    :: HFILE     ! type of input file
+ CHARACTER(LEN=6),    INTENT(IN)    :: HFILETYPE ! type of input file
+ CHARACTER(LEN=28),   INTENT(IN)    :: HFILEPGD  ! type of input file
+ CHARACTER(LEN=6),    INTENT(IN)    :: HFILEPGDTYPE  ! type of input file
 INTEGER,              INTENT(IN)    :: KLUOUT    ! logical unit of output listing
 CHARACTER(LEN=3),     INTENT(IN)    :: HISBA     ! type of ISBA soil scheme
 CHARACTER(LEN=3),     INTENT(IN)    :: HNAT      ! type of surface (nature, gardens)
@@ -112,7 +114,7 @@ REAL,  DIMENSION(KNI)                :: ZPERM  ! permafrost distribution
  CHARACTER(LEN=4)                    :: YNVEG  ! type of no   vegetation
 INTEGER                              :: INVEGTYPE_SAVE, IJPCOVER_SAVE
 LOGICAL                              :: GECOCLIMAP ! T if ecoclimap is used
-LOGICAL                              :: GECOSG
+LOGICAL                              :: GECOSG     ! T if ecoclimap-sg is used
 LOGICAL                              :: GPAR_GARDEN! T if garden data are used
 LOGICAL, DIMENSION(NVEGTYPE_ECOSG)   :: GDATA_DG
 LOGICAL, DIMENSION(NVEGTYPE_ECOSG)   :: GDATA_GROUND_DEPTH, GDATA_ROOT_DEPTH
@@ -200,7 +202,7 @@ IF (HNAT=='NAT' .AND. (IVERSION>=7 .OR. .NOT.GECOCLIMAP)) THEN
         IF (JL<10)  WRITE(YRECFM,FMT='(A4,I1.1)') 'D_DG',JL
         IF (JL>=10) WRITE(YRECFM,FMT='(A4,I2.2)') 'D_DG',JL
       ENDIF
-      CALL READ_SURF_ISBA_PAR_n(DTCO, U, GCP, KPATCH, HFILEPGDTYPE, YRECFM, KLUOUT, KNI, &
+      CALL READ_SURF_ISBA_PAR_n(DTCO, U, GCP, KPATCH, NPAR_VEG_IRR_USE, HFILEPGDTYPE, YRECFM, KLUOUT, KNI, &
                                 IVERSION, IBUGFIX, GDATA_DG, PDEPTH(:,JL,:),IRESP,HDIR='E')
     END DO
     GREAD_OK = .TRUE.
@@ -223,7 +225,7 @@ IF (HNAT=='NAT' .AND. (IVERSION>=7 .OR. .NOT.GECOCLIMAP)) THEN
         ELSE
           YRECFM2='D_ROOT_DEPTH'
         ENDIF                   
-        CALL READ_SURF_ISBA_PAR_n(DTCO, U, GCP, KPATCH, HFILEPGDTYPE, YRECFM2, KLUOUT, KNI, &
+        CALL READ_SURF_ISBA_PAR_n(DTCO, U, GCP, KPATCH, NPAR_VEG_IRR_USE, HFILEPGDTYPE, YRECFM2, KLUOUT, KNI, &
                                   IVERSION, IBUGFIX, GDATA_ROOT_DEPTH, PDEPTH(:,2,:),IRESP,HDIR='E')
       ENDIF
       !
@@ -243,7 +245,7 @@ IF (HNAT=='NAT' .AND. (IVERSION>=7 .OR. .NOT.GECOCLIMAP)) THEN
         YRECFM2='D_GROUND_DEPTH'  
         IF (IVERSION>7 .OR. IVERSION==7 .AND. IBUGFIX>=3) YRECFM2='D_GROUND_DPT'
       ENDIF            
-      CALL READ_SURF_ISBA_PAR_n(DTCO, U, GCP, KPATCH, HFILEPGDTYPE, YRECFM2, KLUOUT, KNI, &
+      CALL READ_SURF_ISBA_PAR_n(DTCO, U, GCP, KPATCH, NPAR_VEG_IRR_USE, HFILEPGDTYPE, YRECFM2, KLUOUT, KNI, &
                                 IVERSION, IBUGFIX, GDATA_GROUND_DEPTH, ZGROUND_DEPTH(:,:),IRESP,HDIR='E')
       !
       IF (.NOT.ANY(GDATA_DG(1:IEND))) THEN
@@ -399,9 +401,9 @@ IF (GECOCLIMAP .AND. .NOT.GREAD_OK ) THEN
     !
     IF (NRANK==NPIO) THEN
       CALL CONVERT_COVER_ISBA(DTCO, IO%CALBEDO, &
-                              HISBA,IO%LTR_ML,1,ZCOVER,GCOVER,'   ',HNAT,PSOILGRID=PSOILGRID, &
-                              PPERM=ZPERM,PDG=PDEPTH,KWG_LAYER=KWG_LAYER, &
-                              OWATER_TO_NATURE=GWATER_TO_NATURE, OTOWN_TO_ROCK=GTOWN_TO_ROCK, &
+                              HISBA,IO%LTR_ML,1,ZCOVER,GCOVER,'   ',HNAT,GECOSG,NPAR_VEG_IRR_USE,&
+                              PSOILGRID=PSOILGRID, PPERM=ZPERM,PDG=PDEPTH,KWG_LAYER=KWG_LAYER,   &
+                              OWATER_TO_NATURE=GWATER_TO_NATURE, OTOWN_TO_ROCK=GTOWN_TO_ROCK,    &
                               OGARDEN=GGARDEN )
     ENDIF
     !
@@ -425,8 +427,8 @@ END SUBROUTINE READ_EXTERN_DEPTH
 !---------------------------------------------------------------------------------------
 !
 !     #######################
-      SUBROUTINE READ_EXTERN_ISBA (U, DTCO, GCP, IO, &
-                                   HFILE,HFILETYPE,HFILEPGD,HFILEPGDTYPE,&
+      SUBROUTINE READ_EXTERN_ISBA (U, DTCO, GCP, IO, NPAR_VEG_IRR_USE,    &
+                                   HFILE,HFILETYPE,HFILEPGD,HFILEPGDTYPE, &
                                   KLUOUT,KNI,HFIELD,HNAME,PFIELD,PDEPTH,OKEY)
 !     #######################
 !
@@ -457,6 +459,7 @@ TYPE(GRID_CONF_PROJ_t),INTENT(INOUT) :: GCP
 !
 TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
 !
+INTEGER,DIMENSION(:), INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 CHARACTER(LEN=28),    INTENT(IN)  :: HFILE     ! name of file
 CHARACTER(LEN=6),     INTENT(IN)  :: HFILETYPE ! type of input file
 CHARACTER(LEN=28),    INTENT(IN)  :: HFILEPGD     ! name of file
@@ -848,7 +851,7 @@ ELSE
     ENDIF
   ENDIF
   !
-  CALL READ_EXTERN_DEPTH(U, DTCO,  GCP, IO,                      &
+  CALL READ_EXTERN_DEPTH(U, DTCO,  GCP, IO, NPAR_VEG_IRR_USE,    &
                          HFILE,HFILETYPE,HFILEPGD,HFILEPGDTYPE,  &
                          KLUOUT,YISBA,YNAT,HFIELD,KNI,           &
                          ILAYER,IPATCH,ZSOILGRID,PDEPTH,IVERSION,IWG_LAYER)

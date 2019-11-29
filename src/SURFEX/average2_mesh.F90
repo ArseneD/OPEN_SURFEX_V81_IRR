@@ -22,6 +22,7 @@
 !!
 !!    Original    12/09/95
 !!     V. Masson  03/2004  externalization
+!!                02/2019   A. Druel - Add MA1 and ARV possibilities (without taking into account the zeros)
 !!
 !----------------------------------------------------------------------------
 !
@@ -55,7 +56,7 @@ REAL(KIND=JPRB) :: ZHOOK_HANDLE
 IF (LHOOK) CALL DR_HOOK('AVERAGE2_MESH',0,ZHOOK_HANDLE)
 SELECT CASE (CATYPE)
 
-  CASE ('ARI')
+  CASE ('ARI', 'ARV')
   WHERE (NSIZE(:,:)/=0)
     PPGDARRAY(:,:) = XSUMVAL(:,:)/NSIZE(:,:)
   ENDWHERE
@@ -70,7 +71,7 @@ SELECT CASE (CATYPE)
     PPGDARRAY(:,:) = XCDREF/EXP(SQRT(NSIZE(:,:)/XSUMVAL(:,:)))
   ENDWHERE
 
-  CASE ('MAJ')
+  CASE ('MAJ', 'MA1')
   WHERE (NSIZE(:,:)/=0)
     PPGDARRAY(:,:) = XSUMVAL(:,:)
   ENDWHERE

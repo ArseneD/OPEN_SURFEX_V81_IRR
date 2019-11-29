@@ -7,7 +7,7 @@ SUBROUTINE PREP_HOR_SNOW_FIELD (DTCO, G, U, GCP, HPROGRAM,      &
                                 HFILE,HFILETYPE,                &
                                 HFILEPGD,HFILEPGDTYPE,          &
                                 KLUOUT,OUNIF,HSNSURF,KPATCH,    &
-                                KTEB_PATCH,                     &
+                                NPAR_VEG_IRR_USE,KTEB_PATCH,    &
                                 KL,TNPSNOW, TPTIME,             &
                                 PUNIF_WSNOW, PUNIF_RSNOW,       &
                                 PUNIF_TSNOW, PUNIF_LWCSNOW,     &
@@ -43,6 +43,7 @@ SUBROUTINE PREP_HOR_SNOW_FIELD (DTCO, G, U, GCP, HPROGRAM,      &
 !!      B. Decharme  04/2014, external init with FA files
 !!                            new init for ES
 !!      P. Marguinaud10/2014, Support for a 2-part PREP
+!!      A. Druel     02/2019, Adapt the code to be compatible with irrigation and transmit NPAR_VEG_IRR_USE
 !!------------------------------------------------------------------
 !
 USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
@@ -62,8 +63,10 @@ USE MODD_SURFEX_MPI, ONLY : NRANK, NPIO, NCOMM, NPROC
 USE MODD_CSTS,           ONLY : XTT
 USE MODD_PREP_SNOW,      ONLY : XGRID_SNOW
 USE MODD_SURF_PAR,       ONLY : XUNDEF
-USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE, NVT_SNOW
+USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE
 USE MODD_PREP,           ONLY : LINTERP,CINTERP_TYPE,CINGRID_TYPE, CMASK
+!
+USE MODD_AGRI,           ONLY : NVEG_IRR
 !
 USE MODD_SNOW_PAR, ONLY : XANSMAX
 !
@@ -75,7 +78,7 @@ USE MODI_PREP_SNOW_BUFFER
 USE MODI_HOR_INTERPOL
 USE MODI_VEGTYPE_GRID_TO_PATCH_GRID
 USE MODI_SNOW_T_WLIQ_TO_HEAT
-USE MODI_VEGTYPE_TO_PATCH
+USE MODI_VEGTYPE_TO_PATCH_IRRIG
 USE MODI_PACK_SAME_RANK
 USE MODI_GET_PREP_INTERP
 USE MODI_PUT_ON_ALL_VEGTYPES
@@ -103,28 +106,29 @@ TYPE(GRID_CONF_PROJ_t),INTENT(INOUT) :: GCP
 !
 TYPE (PREP_CTL),    INTENT (INOUT) :: YDCTL
 !
- CHARACTER(LEN=6),   INTENT(IN)  :: HPROGRAM  ! program calling surf. schemes
- CHARACTER(LEN=28),  INTENT(IN)  :: HFILE     ! file name
- CHARACTER(LEN=6),   INTENT(IN)  :: HFILETYPE ! file type
+ CHARACTER(LEN=6),   INTENT(IN)  :: HPROGRAM     ! program calling surf. schemes
+ CHARACTER(LEN=28),  INTENT(IN)  :: HFILE        ! file name
+ CHARACTER(LEN=6),   INTENT(IN)  :: HFILETYPE    ! file type
  CHARACTER(LEN=28),  INTENT(IN)  :: HFILEPGD     ! file name
  CHARACTER(LEN=6),   INTENT(IN)  :: HFILEPGDTYPE ! file type
-INTEGER,            INTENT(IN)  :: KLUOUT    ! logical unit of output listing
-LOGICAL,            INTENT(IN)  :: OUNIF     ! flag for prescribed uniform field
- CHARACTER(LEN=10)               :: HSNSURF   ! type of field
-INTEGER,            INTENT(IN)  :: KPATCH    ! patch number for output scheme
-INTEGER,            INTENT(IN) :: KTEB_PATCH
-TYPE(NSURF_SNOW), INTENT(INOUT) :: TNPSNOW    ! snow fields
-INTEGER,            INTENT(IN)  :: KL        ! number of points
-TYPE(DATE_TIME),    INTENT(IN)  :: TPTIME    ! date and time
-REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_WSNOW ! prescribed snow content (kg/m2)
-REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_RSNOW ! prescribed density (kg/m3)
-REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_TSNOW ! prescribed temperature (K)
+INTEGER,            INTENT(IN)   :: KLUOUT       ! logical unit of output listing
+LOGICAL,            INTENT(IN)   :: OUNIF        ! flag for prescribed uniform field
+ CHARACTER(LEN=10)               :: HSNSURF      ! type of field
+INTEGER,            INTENT(IN)   :: KPATCH       ! patch number for output scheme
+INTEGER, DIMENSION(:),INTENT(IN) :: NPAR_VEG_IRR_USE ! vegtype with irrigation
+INTEGER,            INTENT(IN)  :: KTEB_PATCH
+TYPE(NSURF_SNOW), INTENT(INOUT) :: TNPSNOW       ! snow fields
+INTEGER,            INTENT(IN)  :: KL            ! number of points
+TYPE(DATE_TIME),    INTENT(IN)  :: TPTIME        ! date and time
+REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_WSNOW   ! prescribed snow content (kg/m2)
+REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_RSNOW   ! prescribed density (kg/m3)
+REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_TSNOW   ! prescribed temperature (K)
 REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_LWCSNOW ! prescribed snow liquid water content (kg/m3)
-REAL,               INTENT(IN)  :: PUNIF_ASNOW ! prescribed albedo (-)
+REAL,               INTENT(IN)  :: PUNIF_ASNOW   ! prescribed albedo (-)
 LOGICAL,            INTENT(INOUT)  :: OSNOW_IDEAL
 REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_SG1SNOW ! 
 REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_SG2SNOW ! 
-REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_HISTSNOW ! 
+REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_HISTSNOW! 
 REAL, DIMENSION(:), INTENT(IN)  :: PUNIF_AGESNOW ! 
 !
 REAL,DIMENSION(:,:,:),  INTENT(IN) :: PVEGTYPE_PATCH ! fraction of each vegtype per patch
@@ -156,8 +160,8 @@ REAL, ALLOCATABLE, DIMENSION(:,:,:) :: ZGRID     ! grid array (x, output snow gr
 REAL, DIMENSION(:,:), ALLOCATABLE :: ZDEPTH, ZPATCH
 !
 TYPE (DATE_TIME)              :: TZTIME_GRIB    ! current date and time
-INTEGER                       :: JP, IP    ! loop on patches
-INTEGER                       :: JL    ! loop on layers
+INTEGER                       :: JP, IP         ! loop on patches
+INTEGER                       :: JL             ! loop on layers
 INTEGER :: INFOMPI, INL, INP, ISNOW_NLAYER, IMASK, JI
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !----------------------------------------------------------------------------
@@ -225,15 +229,15 @@ IF (YDCTL%LPART3) THEN
   ZPATCH(:,:) = 0.
 !
 ! if the number of input patches is NVEGTYPE
-  IF (INP==NVEGTYPE) THEN
-    DO JP = 1,NVEGTYPE
+  IF (INP==NVEGTYPE+NVEG_IRR) THEN
+    DO JP = 1,NVEGTYPE+NVEG_IRR
     ! each vegtype takes the output contribution of the patch it is in
-      IP = VEGTYPE_TO_PATCH(JP,KPATCH)
+      CALL VEGTYPE_TO_PATCH_IRRIG(JP, KPATCH, NPAR_VEG_IRR_USE, IP)
       ZPATCH(:,JP) = PVEGTYPE_PATCH(:,JP,IP)
     ENDDO
   ENDIF
 !
-  CALL GET_PREP_INTERP(INP,KPATCH,ZPATCH,PPATCH,ZPATCH,KR_P)
+  CALL GET_PREP_INTERP(INP,KPATCH,ZPATCH,PPATCH,ZPATCH,NPAR_VEG_IRR_USE,KR_P)
 !
 ! the same for depth that is defined on the output patches
   IF (PRESENT(PDEPTH)) THEN
@@ -241,14 +245,14 @@ IF (YDCTL%LPART3) THEN
     ALLOCATE(ZDEPTH(KL,INP))
     ZDEPTH(:,:) = 0.
   !
-    IF (INP==NVEGTYPE) THEN
-      DO JP = 1,NVEGTYPE
-        IP = VEGTYPE_TO_PATCH(JP,KPATCH)
+    IF (INP==NVEGTYPE+NVEG_IRR) THEN
+      DO JP = 1,NVEGTYPE+NVEG_IRR
+        CALL VEGTYPE_TO_PATCH_IRRIG(JP, KPATCH, NPAR_VEG_IRR_USE, IP)
         ZDEPTH(:,JP) = PDEPTH(:,1,IP)
       ENDDO
     ENDIF
     ! 
-    CALL GET_PREP_INTERP(INP,KPATCH,ZDEPTH,PDEPTH(:,1,:),ZDEPTH,KR_P)
+    CALL GET_PREP_INTERP(INP,KPATCH,ZDEPTH,PDEPTH(:,1,:),ZDEPTH,NPAR_VEG_IRR_USE,KR_P)
     !
   ENDIF
 !
@@ -282,8 +286,8 @@ IF (YDCTL%LPART5) THEN
   !
   IF (KPATCH/=INP.and.INP/=1) THEN
     !
-    ALLOCATE(ZFIELDOUTV(KL,INL,NVEGTYPE))
-    CALL PUT_ON_ALL_VEGTYPES(KL,INL,INP,NVEGTYPE,ZFIELDOUTP,ZFIELDOUTV)
+    ALLOCATE(ZFIELDOUTV(KL,INL,NVEGTYPE+NVEG_IRR))
+    CALL PUT_ON_ALL_VEGTYPES(KL,INL,INP,NVEGTYPE,NPAR_VEG_IRR_USE,ZFIELDOUTP,ZFIELDOUTV)
     !
     !*      6.     Transformation from vegtype grid to patch grid
     !
@@ -295,7 +299,7 @@ IF (YDCTL%LPART5) THEN
       !
       CALL VEGTYPE_GRID_TO_PATCH_GRID(JP, KPATCH, PVEGTYPE_PATCH(1:KSIZE_P(JP),:,JP),  &
                                       PPATCH(1:KSIZE_P(JP),JP), KR_P(1:KSIZE_P(JP),JP), &
-                                      ZFIELDOUTV, ZW%AL(JP)%ZOUT)
+                                      ZFIELDOUTV, ZW%AL(JP)%ZOUT,NPAR_VEG_IRR_USE)
     ENDDO  
     !
     DEALLOCATE(ZFIELDOUTV)

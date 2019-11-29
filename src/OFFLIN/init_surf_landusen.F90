@@ -41,6 +41,8 @@ SUBROUTINE INIT_SURF_LANDUSE_n (DTCO, OREAD_BUDGETC, U, UG, IM, SV, SLT, NDST, &
 !!    -------------
 !!
 !!      modified    06-13  B. Decharme  : New coupling variable
+!!      modified    02-19  A. Druel     : Add XPAR_IRRIGTYPE for irrigation
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
@@ -54,14 +56,14 @@ USE MODD_DST_n, ONLY : DST_NP_t
 USE MODD_SLT_n, ONLY : SLT_t
 USE MODD_SV_n, ONLY : SV_t
 !
-USE MODD_SURF_PAR,       ONLY : XUNDEF
+USE MODD_SURF_PAR,        ONLY : XUNDEF, NUNDEF
 USE MODD_WRITE_SURF_ATM,  ONLY : LSPLIT_PATCH
-USE MODD_SURFEX_MPI, ONLY : NRANK, NPIO, NCOMM
+USE MODD_SURFEX_MPI,      ONLY : NRANK, NPIO, NCOMM
 !
-USE YOMHOOK   ,   ONLY : LHOOK,   DR_HOOK
-USE PARKIND1  ,ONLY : JPRB
+USE YOMHOOK   ,           ONLY : LHOOK,   DR_HOOK
+USE PARKIND1  ,           ONLY : JPRB
 !
-USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE
+USE MODD_DATA_COVER_PAR,  ONLY : NVEGTYPE
 !
 USE MODI_PACK_SAME_RANK
 USE MODI_INIT_IO_SURF_n
@@ -128,7 +130,8 @@ CHARACTER(LEN=3) :: YSNOW_SCHEME
 INTEGER :: ISNOW_NLAYER
 INTEGER           :: JLAYER, INFOMPI
 INTEGER           :: ILU, JP         ! 1D physical dimension
-INTEGER           :: IRESP          ! Error code after redding
+INTEGER           :: IRESP           ! Error code after redding
+INTEGER           :: NMONTH, NDAY    ! Day and month of the simulation (if define)    
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
 !-------------------------------------------------------------------------------
@@ -178,7 +181,7 @@ IF (.NOT.ASSOCIATED(IM%DTV%XPAR_LAI)) ALLOCATE(IM%DTV%XPAR_LAI(ILU,IM%DTV%NTIME,
 IF (.NOT.ASSOCIATED(IM%DTV%XPAR_H_TREE)) ALLOCATE(IM%DTV%XPAR_H_TREE(ILU,NVEGTYPE))
 IF (.NOT.ASSOCIATED(IM%DTV%XPAR_ROOT_DEPTH)) ALLOCATE(IM%DTV%XPAR_ROOT_DEPTH(ILU,NVEGTYPE))
 IF (.NOT.ASSOCIATED(IM%DTV%XPAR_GROUND_DEPTH)) ALLOCATE(IM%DTV%XPAR_GROUND_DEPTH(ILU,NVEGTYPE))
-IF (.NOT.ASSOCIATED(IM%DTV%XPAR_IRRIG)) ALLOCATE(IM%DTV%XPAR_IRRIG(ILU,IM%DTV%NTIME,NVEGTYPE))
+IF (.NOT.ASSOCIATED(IM%DTV%XPAR_IRRIGTYPE)) ALLOCATE(IM%DTV%XPAR_IRRIGTYPE(ILU,NVEGTYPE))
 IF (.NOT.ASSOCIATED(IM%DTV%XPAR_WATSUP)) ALLOCATE(IM%DTV%XPAR_WATSUP(ILU,IM%DTV%NTIME,NVEGTYPE))
 !
 !
@@ -191,14 +194,23 @@ IF (.NOT.ASSOCIATED(IM%DTV%XPAR_WATSUP)) ALLOCATE(IM%DTV%XPAR_WATSUP(ILU,IM%DTV%
 !
 !* re-initialize ISBA with new parameters
 !       
- CALL COMPUTE_ISBA_PARAMETERS(DTCO, OREAD_BUDGETC, UG, U, &
+IF ( HINIT == 'PRE' ) THEN ! IF 'PRE': KDAY and KMONTH not define. No impact (it's only for irrigation)
+  NDAY = 1
+  NMONTH = 1
+ELSEIF (KDAY == NUNDEF) THEN
+  CALL ABOR1_SFX('INIT_SURF_LANDUSE_N: FATAL ERROR, DATE NOT DEFINE (extend 1st CASE)')
+ELSE
+  NDAY = KDAY
+  NMONTH  = KMONTH
+ENDIF
+ CALL COMPUTE_ISBA_PARAMETERS(DTCO, OREAD_BUDGETC, UG, U,                    &
                               IM%O, IM%DTV, IM%SB, IM%S, IM%G, IM%K, IM%NK,  &
                               IM%NG, IM%NP, IM%NPE, IM%NAG, IM%NISS, IM%ISS, &
                               IM%NCHI, IM%CHI, IM%ID, IM%GB, IM%NGB,         &
                               NDST, SLT, SV, HPROGRAM, HINIT, OLAND_USE,     &
-                              ILU, KSV, KSW, HSV, PCO2, PRHOA,     &
-                              PZENITH,PSW_BANDS,PDIR_ALB,PSCA_ALB, &
-                              PEMIS,PTSRAD,PTSURF,HTEST            )
+                              ILU, NMONTH, NDAY, KSV, KSW, HSV, PCO2, PRHOA, &
+                              PZENITH, PSW_BANDS, PDIR_ALB, PSCA_ALB,        &
+                              PEMIS, PTSRAD, PTSURF, HTEST            )
 !
 YSNOW_SCHEME = IM%NPE%AL(1)%TSNOW%SCHEME
 ISNOW_NLAYER = IM%NPE%AL(1)%TSNOW%NLAYER

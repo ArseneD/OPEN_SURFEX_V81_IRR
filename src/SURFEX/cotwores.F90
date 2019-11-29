@@ -3,10 +3,10 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-SUBROUTINE COTWORES(PTSTEP, IO, OSHADE, PK, PEK, PDMAX, PPOI, PCSP, &
-                    PTG, PF2, PSW_RAD, PQA, PQSAT, PPSNV, PDELTA, PRHOA, &
-                    PZENITH, PFFV, PIACAN_SUNLIT, PIACAN_SHADE, PFRAC_SUN, &
-                    PIACAN, PABC, PRS, PGPP, PRESP_LEAF     ) 
+SUBROUTINE COTWORES(PTSTEP, IO, OSHADE, PK, PEK, PDMAX, PPOI, PCSP,               &
+                    PTG, PF2, PSW_RAD, PQA, PQSAT, PPSNV, PDELTA, PRHOA,          &
+                    PZENITH, PFFV, NPAR_VEG_IRR_USE, PIACAN_SUNLIT, PIACAN_SHADE, & 
+                    PFRAC_SUN, PIACAN, PABC, PRS, PGPP, PRESP_LEAF     ) 
 !   #########################################################################
 !
 !!****  *COTWORES*  
@@ -70,7 +70,8 @@ SUBROUTINE COTWORES(PTSTEP, IO, OSHADE, PK, PEK, PDMAX, PPOI, PCSP, &
 !!                             (GTROP)   with Carrer radiative transfer (IO%LTR_ML = T)               
 !!Seferian & Delire  06/2015 : generalization of (i) linear water-stress reponse
 !                              and (ii) exponential decrease of autothrophic respiration to all woody PFTs
-!!      B. Decharme    07/15 : Suppress some numerical adjustement for F2 
+!!      B. Decharme  07/2015 : Suppress some numerical adjustement for F2 
+!!      A. Druel     02/2019 : Adapt the code to be compatible with new irrigation
 !!
 !-------------------------------------------------------------------------------
 !
@@ -85,6 +86,9 @@ USE MODD_DATA_COVER_PAR, ONLY : NVT_TEBD, NVT_TRBE, NVT_BONE,   &
                                 NVT_TRBD, NVT_TEBE, NVT_TENE,   &
                                 NVT_BOBD, NVT_BOND, NVT_SHRB
 USE MODD_SURF_PAR,       ONLY : XUNDEF
+!
+USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE
+USE MODD_AGRI,           ONLY : NVEG_IRR
 !
 USE MODI_CCETR
 USE MODI_COTWO
@@ -104,8 +108,8 @@ IMPLICIT NONE
 REAL,                INTENT(IN)  :: PTSTEP      ! time step
 !
 TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
-TYPE(ISBA_P_t), INTENT(INOUT) :: PK
-TYPE(ISBA_PE_t), INTENT(INOUT) :: PEK
+TYPE(ISBA_P_t), INTENT(INOUT)       :: PK
+TYPE(ISBA_PE_t), INTENT(INOUT)      :: PEK
 !
 LOGICAL, DIMENSION(:),INTENT(IN) :: OSHADE
 !
@@ -137,6 +141,8 @@ REAL,DIMENSION(:),    INTENT(IN)  :: PZENITH
 REAL, DIMENSION(:,:), INTENT(IN)    :: PIACAN_SUNLIT, PIACAN_SHADE, PFRAC_SUN
 !
 REAL, DIMENSION(:), INTENT(IN)      :: PFFV ! Floodplain fraction over vegetation
+!
+INTEGER,DIMENSION(:),   INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 REAL, DIMENSION(:,:), INTENT(INOUT) :: PIACAN ! PAR in the canopy at different gauss level
 !
@@ -210,6 +216,9 @@ REAL, DIMENSION(SIZE(PEK%XLAI,1))    :: ZWORK !Work array
 !
 LOGICAL, DIMENSION(SIZE(PEK%XLAI,1)) :: GHERB, GWOOD, GF2_INF_F2I, GTROP
 !
+REAL, DIMENSION(SIZE(PK%XVEGTYPE_PATCH,1)):: ZVEG_TRBE, ZVEG_TREES
+INTEGER                                   :: JTYPE, JTYPE2
+!
 INTEGER, DIMENSION(1)          :: IDMAX
 !
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
@@ -237,11 +246,22 @@ ZFZERO(:) = PK%XFZERO(:)
 !
 !GTROP = linear stress in case of tropical evergreen forest 
 !        (with fixed f0=0.74 for Carrer rad. transf., f0=0.7 with Calvet rad. transf.)
-GTROP (:) = (PK%XVEGTYPE_PATCH(:,NVT_TRBE) > 0.8) 
+ZVEG_TRBE(:) = 0.
+ZVEG_TREES(:) = 0.
+DO JTYPE = 1, SIZE(PK%XVEGTYPE_PATCH,2)
+  JTYPE2 = JTYPE
+  IF (JTYPE > NVEGTYPE) JTYPE2 = NPAR_VEG_IRR_USE( JTYPE - NVEGTYPE )
+  !
+  IF ( JTYPE2 == NVT_TRBE ) ZVEG_TRBE(:) = ZVEG_TRBE(:) + PK%XVEGTYPE_PATCH(:,JTYPE)
+  IF ( JTYPE2 == NVT_TEBD .OR. JTYPE2 == NVT_TRBE .OR. JTYPE2 == NVT_BONE .OR. JTYPE2 == NVT_TRBD .OR. JTYPE2 == NVT_TEBE .OR. &
+       JTYPE2 == NVT_TENE .OR. JTYPE2 == NVT_BOBD .OR. JTYPE2 == NVT_BOND .OR. JTYPE2 == NVT_SHRB )                            &
+    ZVEG_TREES(:) = ZVEG_TREES(:) + PK%XVEGTYPE_PATCH(:,JTYPE)
+ENDDO
 !
-GHERB(:) = (PK%XVEGTYPE_PATCH(:,NVT_TEBD) + PK%XVEGTYPE_PATCH(:,NVT_TRBE) + PK%XVEGTYPE_PATCH(:,NVT_BONE)   &
-           +PK%XVEGTYPE_PATCH(:,NVT_TRBD) + PK%XVEGTYPE_PATCH(:,NVT_TEBE) + PK%XVEGTYPE_PATCH(:,NVT_TENE)   & 
-           +PK%XVEGTYPE_PATCH(:,NVT_BOBD) + PK%XVEGTYPE_PATCH(:,NVT_BOND) + PK%XVEGTYPE_PATCH(:,NVT_SHRB)<0.5)
+GTROP(:) = ( ZVEG_TRBE(:) > 0.8 )
+!
+GHERB(:) = ( ZVEG_TREES(:) < 0.5 )
+!
 GWOOD      (:) = (.NOT.GHERB (:))
 !
 !

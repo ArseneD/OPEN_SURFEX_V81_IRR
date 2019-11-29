@@ -43,7 +43,8 @@
 !!    R. Alkama     05/2012 : npatch must be 12 or 19 if CPHOTO/='NON'
 !!    B. Decharme   11/2013 : groundwater distribution for water table/surface coupling
 !!    P. Samuelsson 02/2012 : MEB
-!!    B. Decharme    10/2016  bug surface/groundwater coupling
+!!    B. Decharme   10/2016 : bug surface/groundwater coupling
+!!    A. Druel      02/2019 : adapt the code to be compatible with irrigation and new patches (add new verification)
 !!
 !----------------------------------------------------------------------------
 !
@@ -69,6 +70,7 @@ USE MODD_PGDWORK,        ONLY : CATYPE
 USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE, JPCOVER, NVT_TEBD, NVT_BONE, NVT_TRBE, &
                                 NVT_TRBD, NVT_TEBE, NVT_TENE, NVT_BOBD, NVT_BOND
 USE MODD_DATA_COVER,     ONLY : XDATA_VEGTYPE
+USE MODD_AGRI,           ONLY : LAGRIP, LIRRIGMODE, NPATCH_TREE
 !
 USE MODD_ISBA_PAR,       ONLY : NOPTIMLAYER, XOPTIMGRID
 !
@@ -247,12 +249,12 @@ IO%XRM_PATCH     = MAX(MIN(ZRM_PATCH,1.),0.)
 !*    2.2      Reading of ISBA MEB namelist
 !             -----------------------------
 !
-IF (IO%NPATCH<1 .OR. IO%NPATCH>NVEGTYPE) THEN
+IF (IO%NPATCH<1) THEN
   WRITE(ILUOUT,*) '*****************************************'
-  WRITE(ILUOUT,*) '* Number of patch must be between 1 and ', NVEGTYPE
+  WRITE(ILUOUT,*) '* Number of patch must be superior or equal to 1'
   WRITE(ILUOUT,*) '* You have chosen NPATCH = ', IO%NPATCH
   WRITE(ILUOUT,*) '*****************************************'
-  CALL ABOR1_SFX('PGD_ISBA: NPATCH MUST BE BETWEEN 1 AND NVEGTYPE')
+  CALL ABOR1_SFX('PGD_ISBA: NPATCH MUST BE SUPERIOR OR EQUAL TO 1')
 END IF
 !
 ALLOCATE(IO%LMEB_PATCH(IO%NPATCH))
@@ -279,6 +281,13 @@ IF(GMEB)THEN
   GMEB_PATCH_REC(:)=.TRUE.
   GMEB_PATCH_REC(1:3)=.FALSE.
   
+  IF (U%LECOSG) THEN 
+    WRITE(ILUOUT,*) '*******************************************'
+    WRITE(ILUOUT,*) '* WARNING!                                *'
+    WRITE(ILUOUT,*) '* Hard coding with NPATCH not yet upgrade *'
+    WRITE(ILUOUT,*) '* with MEB, ECOSG and irrigation          *'
+    WRITE(ILUOUT,*) '*******************************************'
+  ENDIF
 
   IF(IO%NPATCH==1 .AND. GMEB_PATCH(1))THEN
     WRITE(ILUOUT,*) '*****************************************'
@@ -411,13 +420,32 @@ WRITE(ILUOUT,*) '* With option CPHOTO = ',IO%CPHOTO,'               *'
 WRITE(ILUOUT,*) '* the number of biomass pools is set to ', IO%NNBIOMASS
 WRITE(ILUOUT,*) '*****************************************'
 !
-IF ( IO%CPHOTO/='NON' .AND. IO%NPATCH/=12 .AND. IO%NPATCH/=NVEGTYPE ) THEN
+IF ( IO%CPHOTO/='NIT' .AND. IO%CPHOTO/='NCB' .AND. LIRRIGMODE ) THEN
+  WRITE(ILUOUT,*) '***************************************'
+  WRITE(ILUOUT,*) '*             BE CAREFUL:             *'
+  WRITE(ILUOUT,*) '* You are using the irrigation with   *'
+  WRITE(ILUOUT,*) '* prescribe LAI.                      *'
+  WRITE(ILUOUT,*) '*     Check that it is on purpose !!! *'        
+  WRITE(ILUOUT,*) '***************************************'
+END IF
+IF ( IO%CPHOTO/='NIT' .AND. IO%CPHOTO/='NCB' .AND.  LAGRIP) THEN
+  WRITE(ILUOUT,*) '****************************************'
+  WRITE(ILUOUT,*) '* You are using agricultural practices *'
+  WRITE(ILUOUT,*) '* with prescribe LAI.                  *'
+  WRITE(ILUOUT,*) '*  ==> It is inconsistent !!           *'
+  WRITE(ILUOUT,*) '****************************************'
+  CALL ABOR1_SFX('PGD_ISBA: CPHOTO='//IO%CPHOTO//' IS NOT ALLOWED WITH LAGRIP. USE NIT OR NCB.')
+END IF
+!
+IF ( IO%CPHOTO/='NON' .AND. ( IO%NPATCH < 12 .OR. ( NPATCH_TREE /= 0 .AND. NPATCH_TREE < 12) &
+     .OR. ( U%LECOSG .AND. (LIRRIGMODE.OR.LAGRIP) .AND. IO%NPATCH < 15 .AND. NPATCH_TREE == 0 ) ) ) THEN
   WRITE(ILUOUT,*) '*****************************************'
   WRITE(ILUOUT,*) '* With option CPHOTO = ', IO%CPHOTO
-  WRITE(ILUOUT,*) '* Number of patch must be equal to 12 or NVEGTYPE'
+  WRITE(ILUOUT,*) '* Number of patch must be at least 12   *'
+  WRITE(ILUOUT,*) '* (or 15 if LECOSG AND LIRRIGMODE)      *'
   WRITE(ILUOUT,*) '* But you have chosen NPATCH = ', IO%NPATCH
   WRITE(ILUOUT,*) '*****************************************'
-  CALL ABOR1_SFX('PGD_ISBA: CPHOTO='//IO%CPHOTO//' REQUIRES NPATCH=12 or NVEGTYPE')
+  CALL ABOR1_SFX('PGD_ISBA: CPHOTO='//IO%CPHOTO//' REQUIRES NPATCH>12 (or 15 if LECOSG AND LIRRIGMODE)')
 END IF
 !
 IF ( IO%CPHOTO=='NON' .AND. IO%LTR_ML .AND. .NOT. GMEB) THEN
@@ -624,7 +652,8 @@ ALLOCATE(K%XWDRAIN(ILU))
 IF (U%LECOCLIMAP) THEN
   CALL WRITE_COVER_TEX_ISBA    (IO%NPATCH,IO%NGROUND_LAYER,IO%CISBA)
   CALL WRITE_COVER_TEX_ISBA_PAR(DTCO, IO%CALBEDO, IO%LTR_ML, &
-                                IO%NPATCH,IO%NGROUND_LAYER,IO%CISBA,IO%CPHOTO,IO%XSOILGRID)
+                                IO%NPATCH,IO%NGROUND_LAYER,IO%CISBA,IO%CPHOTO,IO%XSOILGRID, &
+                                U%LECOSG,DTV%NPAR_VEG_IRR_USE)
 END IF
 IF (LHOOK) CALL DR_HOOK('PGD_ISBA',1,ZHOOK_HANDLE)
 !

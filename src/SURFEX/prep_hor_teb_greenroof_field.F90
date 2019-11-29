@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-SUBROUTINE PREP_HOR_TEB_GREENROOF_FIELD (DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP,  &
+SUBROUTINE PREP_HOR_TEB_GREENROOF_FIELD (DTCO, UG, U, USS, GCP, IO, S, K, P, PEK, TG, TOP,  NPAR_VEG_IRR_USE, &
                                          HPROGRAM,HSURF,HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,KPATCH,YDCTL)
 !     #################################################################################################
 !
@@ -27,8 +27,10 @@ SUBROUTINE PREP_HOR_TEB_GREENROOF_FIELD (DTCO, UG, U, USS, GCP, IO, S, K, P, PEK
 !!
 !!    MODIFICATIONS
 !!    -------------
-!!      Original    07/2011
+!!      Original      07/2011
 !!      P. Marguinaud 10/2014, Support for a 2-part PREP
+!!      A. Druel      02/2019, Adapt the code to be compatible with irrigation and transmit NPAR_VEG_IRR_USE
+!!
 !!------------------------------------------------------------------
 !
 !
@@ -55,6 +57,7 @@ USE MODD_PREP_TEB_GREENROOF, ONLY : XGRID_SOIL, NGRID_LEVEL,                    
 USE MODD_ISBA_PAR,           ONLY : XWGMIN
 USE MODD_DATA_COVER_PAR,     ONLY : NVEGTYPE
 USE MODD_SURF_PAR,           ONLY : XUNDEF
+USE MODD_AGRI,               ONLY : NVEG_IRR
 !
 USE MODE_PREP_CTL, ONLY : PREP_CTL, PREP_CTL_CAN
 !
@@ -103,6 +106,7 @@ TYPE(GRID_t), INTENT(INOUT) :: TG
 TYPE(TEB_OPTIONS_t), INTENT(INOUT) :: TOP
 TYPE (PREP_CTL),    INTENT(INOUT) :: YDCTL
 !
+INTEGER,DIMENSION(:),INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
  CHARACTER(LEN=6),   INTENT(IN)  :: HPROGRAM  ! program calling surf. schemes
  CHARACTER(LEN=7),   INTENT(IN)  :: HSURF     ! type of field
  CHARACTER(LEN=28),  INTENT(IN)  :: HATMFILE    ! name of the Atmospheric file
@@ -196,8 +200,8 @@ IF (HSURF=='SN_VEG ') THEN
   CALL PREP_HOR_SNOW_FIELDS(DTCO, TG, U, GCP, HPROGRAM,HSURF, &
                             YFILE,YFILETYPE,                &
                             YFILEPGD, YFILEPGDTYPE,         &
-                            ILUOUT,GUNIF_SNOW, 1, KPATCH,   &
-                            INI, TNPSNOW, TOP%TTIME,        &
+                            ILUOUT,GUNIF_SNOW, 1, NPAR_VEG_IRR_USE, &
+                            KPATCH, INI, TNPSNOW, TOP%TTIME,&
                             XWSNOW_GR, XRSNOW_GR, XTSNOW_GR,&
                             XLWCSNOW_GR, XASNOW_GR,         &
                             LSNOW_IDEAL_GR, ZSG1SNOW,       &
@@ -237,7 +241,7 @@ ELSE IF (YFILETYPE=='GRIB  ') THEN
   IF (NRANK==NPIO) CALL PREP_TEB_GREENROOF_GRIB(HPROGRAM,HSURF,YFILE,ILUOUT,ZFIELDIN)        
 ELSE IF (YFILETYPE=='MESONH' .OR. YFILETYPE=='ASCII ' .OR. YFILETYPE=='LFI   '&
         .OR. YFILETYPE=='FA    '.OR. YFILETYPE=='AROME '.OR.YFILETYPE=='NC    ') THEN
-   CALL PREP_TEB_GREENROOF_EXTERN(DTCO, IO, U, GCP, &
+   CALL PREP_TEB_GREENROOF_EXTERN(DTCO, IO, U, GCP, NPAR_VEG_IRR_USE, &
                                   HPROGRAM,HSURF,YFILE,YFILETYPE,YFILEPGD,YFILEPGDTYPE,ILUOUT,KPATCH,ZFIELDIN)
 ELSE IF (YFILETYPE=='BUFFER') THEN
    CALL PREP_TEB_GREENROOF_BUFFER(HPROGRAM,HSURF,ILUOUT,ZFIELDIN)
@@ -278,12 +282,12 @@ ZW = 0.
 !
 IF (1/=INP) THEN
   !
-  ALLOCATE(ZFIELDOUTV(INI,INL,NVEGTYPE))
-  CALL PUT_ON_ALL_VEGTYPES(INI,INL,INP,NVEGTYPE,ZFIELDOUTP,ZFIELDOUTV)
+  ALLOCATE(ZFIELDOUTV(INI,INL,NVEGTYPE+NVEG_IRR))
+  CALL PUT_ON_ALL_VEGTYPES(INI,INL,INP,NVEGTYPE,NPAR_VEG_IRR_USE,ZFIELDOUTP,ZFIELDOUTV)
   !
-  DO JVEGTYPE=1,NVEGTYPE
+  DO JVEGTYPE=1,NVEGTYPE+NVEG_IRR
     DO JLAYER=1,SIZE(ZW,2)
-      ZW(:,JLAYER) = ZW(:,JLAYER) + S%XVEGTYPE(:,JVEGTYPE) * ZFIELDOUTV(:,JLAYER,JVEGTYPE)
+      ZW(:,JLAYER) = ZW(:,JLAYER) + S%XVEGTYPE2(:,JVEGTYPE) * ZFIELDOUTV(:,JLAYER,JVEGTYPE)
     END DO
   END DO
   DEALLOCATE(ZFIELDOUTV)

@@ -30,6 +30,8 @@ SUBROUTINE UPDATE_ESM_SURF_ATM_n (F, IM, S, U, W, HPROGRAM, KI, KSW, PZENITH, PS
 !!    -------------
 !!      Original    09/2009
 !!      B. Decharme 06/2013 new coupling variables
+!!      A. Druel    02/2019 transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !!-------------------------------------------------------------
 !
 !
@@ -259,8 +261,8 @@ ELSEIF (KTILE==3) THEN
   !          
   IF (U%CNATURE=='ISBA') THEN   
     CALL UPDATE_ESM_ISBA_n(IM%O, IM%S, IM%K, IM%NK, IM%NP, IM%NPE, U%NSIZE_NATURE,&
-                           KSW,ZP_ZENITH,PSW_BANDS,ZP_DIR_ALB, &
-                           ZP_SCA_ALB,ZP_EMIS,ZP_TRAD,ZP_TSURF              )
+                           KSW,ZP_ZENITH,PSW_BANDS,IM%DTV%NPAR_VEG_IRR_USE,       &
+                           ZP_DIR_ALB,ZP_SCA_ALB,ZP_EMIS,ZP_TRAD,ZP_TSURF         )
   ELSE
     CALL ABOR1_SFX('UPDATE_ESM_SURF_ATM_n: NATURE SCHEME MUST BE ACTIVATED FOR EARTH SYSTEM MODEL')
   ENDIF

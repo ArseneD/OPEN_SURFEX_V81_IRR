@@ -4,7 +4,7 @@
 !SFX_LIC for details. version 1.
 !     #########
       SUBROUTINE CONVERT_COVER_CH_ISBA (DTCO, PCOVER, OCOVER, KNPATCH, KPATCH, PK, &
-                                           PSOILRC_SO2, PSOILRC_O3)
+                                           PSOILRC_SO2, PSOILRC_O3,PIRRIG,NPAR_VEG_IRR_USE)
 !     ##############################################################
 !
 !!**** *CONVERT_COVER* convert surface cover classes into secondary 
@@ -34,6 +34,7 @@
 !!    ------------
 !!
 !!    Original   01/2004
+!!    A. Druel   02/2019 - transmit NPAR_VEG_IRR_USE for irrigation
 !     
 !
 !----------------------------------------------------------------------------
@@ -47,7 +48,7 @@ USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
 !
 USE MODD_ISBA_n, ONLY : ISBA_P_t
 !
-USE MODD_DATA_COVER,     ONLY : XDATA_SOILRC_SO2, XDATA_SOILRC_O3 
+USE MODD_DATA_COVER,     ONLY : XDATA_SOILRC_SO2, XDATA_SOILRC_O3
 !
 USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE, JPCOVER
 !
@@ -74,6 +75,9 @@ LOGICAL, DIMENSION(:), INTENT(IN)   :: OCOVER
 
 REAL, DIMENSION(:),   INTENT(OUT)   :: PSOILRC_SO2
 REAL, DIMENSION(:),   INTENT(OUT)   :: PSOILRC_O3
+!
+REAL, DIMENSION(:,:), INTENT(IN)    :: PIRRIG  ! fraction of irrigation for each vegtype
+INTEGER,DIMENSION(:), INTENT(IN)    :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
 !
@@ -86,9 +90,9 @@ IF (LHOOK) CALL DR_HOOK('CONVERT_COVER_CH_ISBA',0,ZHOOK_HANDLE)
 !
 IF (ASSOCIATED(DTCO%XDATA_WEIGHT)) DEALLOCATE(DTCO%XDATA_WEIGHT)
 !
- CALL AV_PGD_1P(DTCO, PSOILRC_SO2 ,PCOVER, XDATA_SOILRC_SO2(:,:), 'NAT', 'ARI', OCOVER,&
+ CALL AV_PGD_1P(DTCO, PSOILRC_SO2 ,PCOVER, XDATA_SOILRC_SO2(:,:), PIRRIG, NPAR_VEG_IRR_USE, 'NAT', 'ARI', OCOVER,&
              PK%NR_P, KNPATCH, KPATCH, KDECADE=1)
- CALL AV_PGD_1P(DTCO, PSOILRC_O3, PCOVER ,XDATA_SOILRC_O3 (:,:), 'NAT', 'ARI', OCOVER,&
+ CALL AV_PGD_1P(DTCO, PSOILRC_O3, PCOVER ,XDATA_SOILRC_O3 (:,:), PIRRIG, NPAR_VEG_IRR_USE, 'NAT', 'ARI', OCOVER,&
              PK%NR_P, KNPATCH, KPATCH, KDECADE=1)
 !
 IF (ASSOCIATED(DTCO%XDATA_WEIGHT)) DEALLOCATE(DTCO%XDATA_WEIGHT)

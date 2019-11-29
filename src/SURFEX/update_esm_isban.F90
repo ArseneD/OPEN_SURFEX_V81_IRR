@@ -3,8 +3,8 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     ################################################################
-      SUBROUTINE UPDATE_ESM_ISBA_n (IO, S, K, NK, NP, NPE, KI,KSW,PZENITH,PSW_BANDS,PDIR_ALB,& 
-                                   PSCA_ALB,PEMIS,PTSRAD,PTSURF      )
+      SUBROUTINE UPDATE_ESM_ISBA_n (IO, S, K, NK, NP, NPE, KI,KSW,PZENITH,PSW_BANDS,NPAR_VEG_IRR_USE,&
+                                   PDIR_ALB,PSCA_ALB,PEMIS,PTSRAD,PTSURF      )
 !     ################################################################
 !
 !!****  *UPDATE_ESM_ISBA_n* - update ISBA radiative and physical properties in Earth System Model 
@@ -35,9 +35,11 @@
 !!
 !!    MODIFICATIONS
 !!    -------------
-!!      Original    09/2009
-!!      B. Decharme 06/2013 new coupling variables
+!!      Original      09/2009
+!!      B. Decharme   06/2013 new coupling variables
 !!      P. Samuelsson 10/2014 MEB
+!!      A. Druel      02/2019 transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
@@ -75,6 +77,8 @@ INTEGER,                            INTENT(IN)  :: KSW       ! number of short-w
 !
 REAL,             DIMENSION(KI),    INTENT(IN)  :: PZENITH   ! solar zenithal angle
 REAL,             DIMENSION(KSW),   INTENT(IN)  :: PSW_BANDS ! short-wave spectral bands
+!
+INTEGER,          DIMENSION(:),     INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 REAL,             DIMENSION(KI,KSW),INTENT(OUT) :: PDIR_ALB  ! direct albedo for each band
 REAL,             DIMENSION(KI,KSW),INTENT(OUT) :: PSCA_ALB  ! diffuse albedo for each band
@@ -130,7 +134,7 @@ DO JP = 1,IO%NPATCH
   PEK => NPE%AL(JP)
   KK => NK%AL(JP)
 
-  CALL UPDATE_RAD_ISBA_n(IO, S, KK, PK, PEK, JP, PZENITH, PSW_BANDS, &
+  CALL UPDATE_RAD_ISBA_n(IO, S, KK, PK, PEK, JP, PZENITH, PSW_BANDS, NPAR_VEG_IRR_USE,   &
                         ZDIR_ALB_PATCH(:,:,JP),ZSCA_ALB_PATCH(:,:,JP),ZEMIS_PATCH(:,JP)  )
   !
   !*       3.     radiative surface temperature

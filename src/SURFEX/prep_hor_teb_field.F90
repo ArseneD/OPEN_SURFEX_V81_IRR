@@ -4,7 +4,7 @@
 !SFX_LIC for details. version 1.
 !     #########
 SUBROUTINE PREP_HOR_TEB_FIELD (B, BOP, DTCO, U, GCP, G, T, TOP, &
-                               HPROGRAM,HSURF,HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,KPATCH,YDCTL)
+                               HPROGRAM,HSURF,HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,KPATCH,NPAR_VEG_IRR_USE,YDCTL)
 !     #################################################################################
 !
 !
@@ -29,6 +29,8 @@ SUBROUTINE PREP_HOR_TEB_FIELD (B, BOP, DTCO, U, GCP, G, T, TOP, &
 !!      Original    01/2004
 !!      P. Le Moigne 10/2005, Phasage Arome
 !!      P. Marguinaud10/2014, Support for a 2-part PREP
+!!      A. Druel     02/2019, Transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !!------------------------------------------------------------------
 !
 USE MODD_BEM_n, ONLY : BEM_t
@@ -99,7 +101,8 @@ TYPE (PREP_CTL),    INTENT(INOUT) :: YDCTL
  CHARACTER(LEN=28),  INTENT(IN)  :: HPGDFILE    ! name of the Atmospheric file
  CHARACTER(LEN=6),   INTENT(IN)  :: HPGDFILETYPE! type of the Atmospheric file
 !
-INTEGER,            INTENT(IN)  :: KPATCH
+INTEGER,            INTENT(IN)   :: KPATCH
+INTEGER,DIMENSION(:), INTENT(IN) :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 !*      0.2    declarations of local variables
 !
@@ -153,8 +156,8 @@ IF (HSURF=='SN_ROOF') THEN
                             HPROGRAM,HSURF,              &
                             YFILE,YFILETYPE,             &
                             YFILEPGD, YFILEPGDTYPE,      &
-                            ILUOUT,GUNIF,1,KPATCH,       &
-                            SIZE(G%XLAT),TNPSNOW, TOP%TTIME,&
+                            ILUOUT,GUNIF,1,NPAR_VEG_IRR_USE,&
+                            KPATCH,SIZE(G%XLAT),TNPSNOW, TOP%TTIME,&
                             XWSNOW_ROOF, XRSNOW_ROOF,    &
                             XTSNOW_ROOF, XLWCSNOW_ROOF,  &
                             XASNOW_ROOF,                 &
@@ -193,8 +196,8 @@ ELSE IF (HSURF=='SN_ROAD') THEN
                             HPROGRAM,HSURF,              &
                             YFILE,YFILETYPE,             &
                             YFILEPGD, YFILEPGDTYPE,      &                            
-                            ILUOUT,GUNIF,1,KPATCH,       &
-                            SIZE(G%XLAT),TNPSNOW, TOP%TTIME,&
+                            ILUOUT,GUNIF,1,NPAR_VEG_IRR_USE,&
+                            KPATCH,SIZE(G%XLAT),TNPSNOW, TOP%TTIME,&
                             XWSNOW_ROAD, XRSNOW_ROAD,    &
                             XTSNOW_ROAD, XLWCSNOW_ROAD,  &
                             XASNOW_ROAD,                 &

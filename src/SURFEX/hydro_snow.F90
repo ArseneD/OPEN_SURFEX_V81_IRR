@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-      SUBROUTINE HYDRO_SNOW(OGLACIER, PTSTEP, PVEGTYPE, PSR, PLES, PMELT, TPSNOW, PPG_MELT )  
+      SUBROUTINE HYDRO_SNOW(OGLACIER, PTSTEP, PVEGTYPE, PSR, PLES, PMELT, TPSNOW, PPG_MELT, NPAR_VEG_IRR_USE)
 !     #####################################################################
 !
 !!****  *HYDRO_SNOW*  
@@ -56,6 +56,8 @@
 !!                  14/05/02 (A. Boone) snow only, and skip code if '3-L' option in force
 !!                   03/2009 (B. Decharme) Consistency with Arpege permanent snow/ice treatment
 !!                                          (LGLACIER)
+!!                   02/2019 (A. Druel )   Adapt the code to be compatible with irrigation (and new patches)
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.     DECLARATIONS
@@ -69,6 +71,9 @@ USE MODD_SNOW_PAR,    ONLY : XANS_T, XANS_TODRY, XANSMIN, XANSMAX, &
                                XAGLAMAX  
 USE MODD_SURF_PAR,    ONLY : XUNDEF
 USE MODD_DATA_COVER_PAR, ONLY : NVT_SNOW
+!
+USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE
+USE MODD_AGRI,           ONLY : NVEG_IRR
 !
 !
 USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
@@ -90,10 +95,11 @@ REAL, DIMENSION(:), INTENT(IN)    :: PSR,  PLES, PMELT
 !                                    PSR = snow rate
 !                                    PLES = latent heat of sublimation over the snow
 !                                    PMELT = melting rate of snow
-TYPE(SURF_SNOW), INTENT(INOUT) :: TPSNOW
+TYPE(SURF_SNOW), INTENT(INOUT)    :: TPSNOW
 REAL, DIMENSION(:), INTENT(INOUT) :: PPG_MELT
 !                                    TPSNOW%WSNOW(:,1,1) = equivalent water content of the
 !                                    PPG_MELT = total water reaching the ground
+INTEGER,DIMENSION(:), INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 !*      0.2    declarations of local variables
 !
@@ -103,6 +109,10 @@ REAL, DIMENSION(SIZE(PSR)) :: ZSNOWSWEM, ZWSX,  ZANSMIN, ZANSMAX
 !                                         snow reservoir
 !                             ZANSMIN = Minimum glacier albedo
 !                             ZANSMAX = Maximum glacier albedo
+!
+REAL, DIMENSION(size(PVEGTYPE,1))  :: PVEG_SNOW ! size: IJ
+INTEGER                            :: JVEG, JK      ! loop on vegtypes
+!
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
 !-------------------------------------------------------------------------------
@@ -150,8 +160,14 @@ WHERE(TPSNOW%WSNOW(:,1) < 1.0E-10) TPSNOW%WSNOW(:,1) = 0.
 !               ------------------------
 !
 IF(OGLACIER)THEN
-  ZANSMIN(:) = XAGLAMIN * PVEGTYPE(:,NVT_SNOW) + XANSMIN * (1.0-PVEGTYPE(:,NVT_SNOW))
-  ZANSMAX(:) = XAGLAMAX * PVEGTYPE(:,NVT_SNOW) + XANSMAX * (1.0-PVEGTYPE(:,NVT_SNOW))
+  PVEG_SNOW(:) = 0.
+  DO JVEG = 1, NVEGTYPE+NVEG_IRR
+    JK = JVEG
+    IF (JVEG > NVEGTYPE) JK = NPAR_VEG_IRR_USE( JVEG - NVEGTYPE )
+    IF ( JK == NVT_SNOW ) PVEG_SNOW(:) = PVEG_SNOW(:) + PVEGTYPE(:,JVEG)
+  ENDDO
+  ZANSMIN(:) = XAGLAMIN * PVEG_SNOW(:) + XANSMIN * (1.0-PVEG_SNOW(:))
+  ZANSMAX(:) = XAGLAMAX * PVEG_SNOW(:) + XANSMAX * (1.0-PVEG_SNOW(:))
 ELSE
   ZANSMIN(:) = XANSMIN
   ZANSMAX(:) = XANSMAX

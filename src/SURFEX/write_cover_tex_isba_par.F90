@@ -4,7 +4,8 @@
 !SFX_LIC for details. version 1.
 !     #########
       SUBROUTINE WRITE_COVER_TEX_ISBA_PAR (DTCO, HALBEDO, OTR_ML, &
-                                           KPATCH,KLAYER,HISBA,HPHOTO,PSOILGRID)
+                                           KPATCH,KLAYER,HISBA,HPHOTO,PSOILGRID, &
+                                           OECOSG,NPAR_VEG_IRR_USE)
 !     ##########################
 !
 !!**** *WRITE_COVER_TEX* writes the ISBA data arrays into a tex file
@@ -35,8 +36,9 @@
 !!
 !!    Original    08/01/98
 !!
-!!      P Le Moigne 09/2005 AGS modifs of L. Jarlan
-!!      B. Decharme    2008 Bug if ZDMAX = XUNDEF
+!!      P Le Moigne   09/2005 AGS modifs of L. Jarlan
+!!      B. Decharme      2008 Bug if ZDMAX = XUNDEF
+!!      A. Druel      02/2019 Transmit ECOSG & NPAR_VEG_IRR_USE for irrigation
 !----------------------------------------------------------------------------
 !
 !*    0.     DECLARATION
@@ -79,6 +81,8 @@ INTEGER,          INTENT(IN) :: KLAYER! number of soil layers
  CHARACTER(LEN=*), INTENT(IN) :: HISBA ! type of soil (Force-Restore OR Diffusion)
  CHARACTER(LEN=*), INTENT(IN) :: HPHOTO! type of photosynthesis
 REAL, DIMENSION(:),INTENT(IN) :: PSOILGRID ! reference grid for DIF
+LOGICAL,           INTENT(IN) :: OECOSG    ! ECOCLIMAP-SG activated ?
+INTEGER,DIMENSION(:), INTENT(IN) :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 !*    0.2    Declaration of local variables
 !            ------------------------------
@@ -137,24 +141,26 @@ GCOVER(:) = .TRUE.
 !
 DO JJ=1,12
   CALL CONVERT_COVER_ISBA(DTCO, HALBEDO, &
-                          HISBA,OTR_ML,3*JJ-1,ZCOVER,GCOVER,HPHOTO, 'NAT',         &
-                            PVEG=ZVEG(:,:,JJ), PLAI=ZLAI(:,:,JJ),            &
-                            PZ0=ZZ0VEG(:,:,JJ), PEMIS_ECO=ZEMIS_ECO(:,:,JJ), &
-                            PF2I=ZF2I(:,:,JJ),OSTRESS=GSTRESS(:,:,JJ)        )  
+                          HISBA,OTR_ML,3*JJ-1,ZCOVER,GCOVER,HPHOTO, 'NAT', &
+                          OECOSG,NPAR_VEG_IRR_USE,                         &
+                          PVEG=ZVEG(:,:,JJ), PLAI=ZLAI(:,:,JJ),            &
+                          PZ0=ZZ0VEG(:,:,JJ), PEMIS_ECO=ZEMIS_ECO(:,:,JJ), &
+                          PF2I=ZF2I(:,:,JJ),OSTRESS=GSTRESS(:,:,JJ)        )  
 END DO
 
  CALL CONVERT_COVER_ISBA(DTCO, HALBEDO, &
-                          HISBA,OTR_ML,2,ZCOVER,GCOVER,HPHOTO, 'NAT',            &
-                        PRSMIN=ZRSMIN,PGAMMA=ZGAMMA,PWRMAX_CF=ZWRMAX_CF, &
-                        PRGL=ZRGL,PCV=ZCV,PSOILGRID=PSOILGRID,           &
-                        PDG=ZDG,KWG_LAYER=IWG_LAYER,PDROOT=ZDROOT,       &
-                        PDG2=ZDG2,PZ0_O_Z0H=ZZ0_O_Z0H,                   &
-                        PALBNIR_VEG=ZALBNIR_VEG,PALBVIS_VEG=ZALBVIS_VEG, &
-                        PALBUV_VEG=ZALBUV_VEG,                           &
-                        PROOTFRAC=ZROOTFRAC,                             &
-                        PGMES=ZGMES,PBSLAI=ZBSLAI,PLAIMIN=ZLAIMIN,       &
-                        PSEFOLD=ZSEFOLD,PGC=ZGC,PDMAX=ZDMAX,             &
-                        PH_TREE=ZH_TREE,PRE25=ZRE25                       )  
+                          HISBA,OTR_ML,2,ZCOVER,GCOVER,HPHOTO, 'NAT',      &
+                          OECOSG,NPAR_VEG_IRR_USE,                         &
+                          PRSMIN=ZRSMIN,PGAMMA=ZGAMMA,PWRMAX_CF=ZWRMAX_CF, &
+                          PRGL=ZRGL,PCV=ZCV,PSOILGRID=PSOILGRID,           &
+                          PDG=ZDG,KWG_LAYER=IWG_LAYER,PDROOT=ZDROOT,       &
+                          PDG2=ZDG2,PZ0_O_Z0H=ZZ0_O_Z0H,                   &
+                          PALBNIR_VEG=ZALBNIR_VEG,PALBVIS_VEG=ZALBVIS_VEG, &
+                          PALBUV_VEG=ZALBUV_VEG,                           &
+                          PROOTFRAC=ZROOTFRAC,                             &
+                          PGMES=ZGMES,PBSLAI=ZBSLAI,PLAIMIN=ZLAIMIN,       &
+                          PSEFOLD=ZSEFOLD,PGC=ZGC,PDMAX=ZDMAX,             &
+                          PH_TREE=ZH_TREE,PRE25=ZRE25                       )  
 !
 !
 !-------------------------------------------------------------------------------

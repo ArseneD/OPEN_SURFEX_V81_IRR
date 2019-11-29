@@ -37,7 +37,8 @@
 !!      P Le Moigne 06/2006 seeding and irrigation
 !!      G Pigeon    08/2012 ROUGH_ROOF, ROUGH_WALL
 !!      V. Masson   08/2013  Adds solar panel variables
-!!      P Samuelsson 10/2014 Multi-energy balance (MEB)
+!!      P Samuelsson10/2014 Multi-energy balance (MEB)
+!!      J.Etchanchu 01/2018 Add irrigation variables (A. Druel 02/2019 Add IRRIGFRAC + change dim)
 !!----------------------------------------------------------------------
 !
 !*       0.   DECLARATIONS
@@ -154,7 +155,14 @@ TYPE (DATE_TIME), POINTER, DIMENSION(:,:)   :: TDATA_SEED     ! seeding date
 TYPE (DATE_TIME), POINTER, DIMENSION(:,:)   :: TDATA_REAP     ! reaping date      
 !      
 REAL, DIMENSION(:,:), ALLOCATABLE :: XDATA_WATSUP   ! water supply quantity
-REAL, DIMENSION(:,:), ALLOCATABLE :: XDATA_IRRIG    ! flag for irrigation
+!
+REAL, DIMENSION(:,:), ALLOCATABLE :: XDATA_IRRIGTYPE    ! irrigation type
+!
+REAL, DIMENSION(:,:), ALLOCATABLE :: XDATA_IRRIGFRAC   ! irrigation maximal frequency
+REAL, DIMENSION(:,:), ALLOCATABLE :: XDATA_IRRIGFREQ   ! irrigation maximal frequency
+REAL, DIMENSION(:,:), ALLOCATABLE :: XDATA_IRRIGTIME   ! irrigation amount application time
+!
+REAL, DIMENSION(:,:,:), ALLOCATABLE :: XDATA_F2THRESHOLD    ! f2 threshold for irrigation triggering
 !
 REAL, DIMENSION(:),   ALLOCATABLE :: XDATA_TOWN   ! artificial surfaces fraction
 REAL, DIMENSION(:),   ALLOCATABLE :: XDATA_NATURE ! natural and cul. fraction

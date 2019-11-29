@@ -34,6 +34,8 @@ SUBROUTINE INIT_TEB_GREENROOF_PGD_n (DTCO, U, OCH_BIO_FLUX, G, PGREENROOF, TOP, 
 !!    -------------
 !!      Original    09/2009
 !!                  11/2013 (B. Decharme) No exp profile with DIF
+!!                  02/2019 (A. Druel)    Transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
@@ -52,6 +54,7 @@ USE MODD_DATA_ISBA_n, ONLY : DATA_ISBA_t
 USE MODD_GR_BIOG_n, ONLY : GR_BIOG_t
 !
 USE MODD_AGRI_n, ONLY : AGRI_t
+USE MODD_AGRI,   ONLY : NVEG_IRR
 !
 USE MODD_TYPE_DATE_SURF
 USE MODD_TYPE_SNOW
@@ -140,7 +143,7 @@ REAL, PARAMETER   :: ZHCAPSOIL_OM  = 2.5E+6    ! Soil heat capacity for OM
 REAL, PARAMETER   :: ZMPOT_WWILT   = -150.     ! Matric potential at wilting point (m)
 REAL, PARAMETER   :: ZHYDCOND_WFC  = 1.157E-9  ! Hydraulic conductivity at field capacity (m/s)
 !
-REAL, DIMENSION(0) :: ZTDEEP_CLI, ZGAMMAT_CLI, ZTHRESHOLD
+REAL, DIMENSION(0) :: ZTDEEP_CLI, ZGAMMAT_CLI
 !
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
@@ -207,7 +210,7 @@ IF (OPATCH1) THEN
   ENDDO  
   !
   ALLOCATE(S%XPATCH(KI,1),P%XPATCH(KI))
-  ALLOCATE(S%XVEGTYPE_PATCH(KI,NVEGTYPE,1),P%XVEGTYPE_PATCH(KI,NVEGTYPE))
+  ALLOCATE(S%XVEGTYPE_PATCH(KI,NVEGTYPE+NVEG_IRR,1),P%XVEGTYPE_PATCH(KI,NVEGTYPE+NVEG_IRR))
   S%XPATCH(:,1) = 1.
   P%XPATCH(:) = S%XPATCH(:,1)
   S%XVEGTYPE_PATCH(:,:,1) = S%XVEGTYPE
@@ -219,9 +222,9 @@ IF (OPATCH1) THEN
   ENDDO  
   !
   IF (.NOT. IO%LPAR) THEN
-    CALL CONVERT_PATCH_ISBA(DTCO, DTV, IO, IDECADE, IDECADE, TOP%XCOVER, TOP%LCOVER,&
-                        .FALSE.,'GRD', 1, K, P, PEK, &
-                        .TRUE., .FALSE., .FALSE., .FALSE., .FALSE., .FALSE., &
+    CALL CONVERT_PATCH_ISBA(DTCO, DTV, IO, 1, 1, IDECADE, IDECADE, TOP%XCOVER, TOP%LCOVER, &
+                        .FALSE.,.FALSE.,.FALSE.,'GRD', 1, K, P, PEK,                       &
+                        .TRUE., .FALSE., .FALSE., .FALSE., .FALSE., .FALSE.,               &
                         PSOILGRID=IO%XSOILGRID  )   
   ELSE
     CALL INIT_FROM_DATA_TEB_VEG_n(DTV, K, P, PEK, IDECADE, .FALSE., .TRUE., .FALSE.,.FALSE.)
@@ -242,8 +245,8 @@ END IF
 !               -----------------------------------------
 !
 IF (.NOT. IO%LPAR) THEN
-  CALL CONVERT_PATCH_ISBA(DTCO, DTV, IO, IDECADE, IDECADE, TOP%XCOVER, TOP%LCOVER,&
-                        .FALSE.,'GRD', 1, K, P, PEK, &
+  CALL CONVERT_PATCH_ISBA(DTCO, DTV, IO, 1, 1, IDECADE, IDECADE, TOP%XCOVER, TOP%LCOVER, &
+                        .FALSE., .FALSE., .FALSE., 'GRD', 1, K, P, PEK,                  &
                         .FALSE., .TRUE., .FALSE., .FALSE., .FALSE., .FALSE.  )   
 ELSE
 
@@ -263,7 +266,7 @@ ALLOCATE(YSS%XAOSIP(0))
  CALL INIT_VEG_PGD_n(YSS, DTV, IO, S, K, K, P, PEK, YAG, KI,                     &
                       HPROGRAM, 'TOWN  ',ILUOUT, KI, TOP%TTIME%TDATE%MONTH, &
                       .FALSE., .FALSE., ZTDEEP_CLI, ZGAMMAT_CLI,            &
-                      .FALSE., ZTHRESHOLD, HINIT, PCO2, PRHOA  )
+                      .FALSE., HINIT, PCO2, PRHOA  )
 !
 !-------------------------------------------------------------------------------
 !

@@ -35,7 +35,9 @@
 !!    Original    23/03/11
 !!
 !!    R. Alkama    05/2012 : read 19 vegtypes rather than 12
-!     10/2014 : add status='old' for ecoclimap.bin files E. Martin
+!!     10/2014 : add status='old' for ecoclimap.bin files E. Martin
+!!    A. Druel     02/2019 : change XDATA_IRRIG for XDATA_IRRIGTYPE
+!!
 !----------------------------------------------------------------------------
 !
 !*    0.     DECLARATION
@@ -49,7 +51,7 @@ USE MODD_DATA_COVER,     ONLY : XDATA_TOWN, XDATA_NATURE, XDATA_SEA, XDATA_WATER
                                   XDATA_LAI_ALL_YEARS, TDATA_SEED, TDATA_REAP,      &
                                   XDATA_ALB_SOIL_NIR, XDATA_ALB_SOIL_VIS,           &
                                   XDATA_ALB_VEG_NIR, XDATA_ALB_VEG_VIS,             &                                  
-                                  XDATA_WATSUP, XDATA_IRRIG,                        &
+                                  XDATA_WATSUP, XDATA_IRRIGTYPE,                        &
                                   XDATA_Z0_TOWN, XDATA_BLD_HEIGHT, XDATA_WALL_O_HOR,&
                                   XDATA_BLD, XDATA_GARDEN,                          &
                                   XDATA_ALB_ROOF, XDATA_ALB_ROAD, XDATA_ALB_WALL,   &
@@ -258,7 +260,7 @@ DO JVEGTYPE=1,NVEGTYPE
       IREC=IREC+1
       READ(41,REC=IREC) TDATA_SEED(ICOVER,JVEGTYPE)%TDATE%MONTH, TDATA_SEED(ICOVER,JVEGTYPE)%TDATE%DAY, &
         TDATA_REAP(ICOVER,JVEGTYPE)%TDATE%MONTH, TDATA_REAP(ICOVER,JVEGTYPE)%TDATE%DAY, &
-        XDATA_WATSUP(ICOVER,JVEGTYPE),XDATA_IRRIG(ICOVER,JVEGTYPE)
+        XDATA_WATSUP(ICOVER,JVEGTYPE),XDATA_IRRIGTYPE(ICOVER,JVEGTYPE)
     ENDIF
   ENDIF
 ENDDO

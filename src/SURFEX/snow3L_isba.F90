@@ -11,7 +11,7 @@ SUBROUTINE SNOW3L_ISBA(IO, G, PK, PEK, DK, DEK, DMK, OMEB, HIMPLICIT_WIND,      
                        PPEQ_A_COEF, PPET_B_COEF, PPEQ_B_COEF, PTHRUFAL,          &
                        PGRNDFLUX, PFLSN_COR, PGSFCSNOW, PEVAPCOR, PLES3L, PLEL3L,&
                        PEVAP, PSNOWSFCH, PDELHEATN, PDELHEATN_SFC, PRI, PZENITH, &
-                       PDELHEATG, PDELHEATG_SFC, PQS             )                               
+                       PDELHEATG, PDELHEATG_SFC, PQS, NPAR_VEG_IRR_USE           )                               
 !     ######################################################################################
 !
 !!****  *SNOW3L_ISBA*  
@@ -64,7 +64,9 @@ SUBROUTINE SNOW3L_ISBA(IO, G, PK, PEK, DK, DEK, DMK, OMEB, HIMPLICIT_WIND,      
 !!      Modified by B. Decharme  (08/2013): Qsat as argument (needed for coupling with atm)
 !!      Modified by A. Boone     (10/2014): MEB: pass in fluxes when using MEB
 !!      Modified by B. Decharme  (03/2016): No snowdrift under forest
-!!      Modified by M. Lafaysse (08/2015): MEB-Crocus coupling
+!!      Modified by M. Lafaysse  (08/2015): MEB-Crocus coupling
+!!      Modified by A. Druel     (02/2019): Streamlines the code and adapt it to be compatible with new irrigation
+!!
 !-------------------------------------------------------------------------------
 !
 USE MODD_ISBA_OPTIONS_n, ONLY : ISBA_OPTIONS_t
@@ -83,6 +85,9 @@ USE MODD_DATA_COVER_PAR, ONLY : NVT_SNOW,                       &
                                 NVT_TEBD, NVT_TRBE, NVT_BONE,   &
                                 NVT_TRBD, NVT_TEBE, NVT_TENE,   &
                                 NVT_BOBD, NVT_BOND, NVT_SHRB
+!
+USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE
+USE MODD_AGRI,           ONLY : NVEG_IRR
 !
 USE MODI_SNOW3L
 USE MODI_SNOWCRO
@@ -207,12 +212,16 @@ REAL, DIMENSION(:), INTENT(OUT)     :: PQS
 ! puis plus tard dans LALB
 REAL, DIMENSION(:), INTENT(IN)      :: PZENITH    ! solar zenith angle
 !
+INTEGER,DIMENSION(:), INTENT(IN)    :: NPAR_VEG_IRR_USE ! vegtype with irrigation
+!
 !*      0.2    declarations of local variables
 !
 REAL, PARAMETER                     :: ZCHECK_TEMP = 50.0 
 !                                      Limit to check suspicious low temperature (K)
 !
 INTEGER                             :: JWRK, JJ ! Loop control
+!
+INTEGER                             :: JVEG, JK ! loop on vegtypes
 !
 INTEGER                             :: INLVLS   ! maximum number of snow layers
 INTEGER                             :: INLVLG   ! number of ground layers
@@ -822,10 +831,16 @@ ENDDO
 !
 DO JJ=1,KSIZE1
    JI = KMASK(JJ)
-   ZP_VEGTYPE (JJ) = PVEGTYPE (JI,NVT_SNOW)
-   ZP_FOREST  (JJ) = PVEGTYPE(JI,NVT_TEBD) + PVEGTYPE(JI,NVT_TRBE) + PVEGTYPE(JI,NVT_BONE)   &
-                   + PVEGTYPE(JI,NVT_TRBD) + PVEGTYPE(JI,NVT_TEBE) + PVEGTYPE(JI,NVT_TENE)   & 
-                   + PVEGTYPE(JI,NVT_BOBD) + PVEGTYPE(JI,NVT_BOND) + PVEGTYPE(JI,NVT_SHRB)    
+   ZP_VEGTYPE (JJ) = 0.
+   ZP_FOREST  (JJ) = 0.
+   DO JVEG = 1, NVEGTYPE+NVEG_IRR
+     JK = JVEG
+     IF (JVEG > NVEGTYPE) JK = NPAR_VEG_IRR_USE( JVEG - NVEGTYPE )
+     IF ( JK == NVT_SNOW ) ZP_VEGTYPE (JJ) = ZP_VEGTYPE (JJ) + PVEGTYPE (JI,JVEG)
+     IF ( JK == NVT_TEBD .OR. JK == NVT_TRBE .OR. JK == NVT_BONE .OR. JK == NVT_TRBD .OR. JK == NVT_TEBE .OR. &
+          JK == NVT_TENE .OR. JK == NVT_BOBD .OR. JK == NVT_BOND .OR. JK == NVT_SHRB )                        &
+       ZP_FOREST  (JJ) = ZP_FOREST  (JJ) + PVEGTYPE (JI,JVEG)
+   ENDDO
 ENDDO
 !
 !

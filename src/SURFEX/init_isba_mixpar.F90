@@ -4,7 +4,7 @@
 !SFX_LIC for details. version 1.
 !     #########
       SUBROUTINE INIT_ISBA_MIXPAR (DTCO, DTV, KDIM, IO, &
-                                   KDECADE,KDECADE2,PCOVER,OCOVER,HSFTYPE)
+                                   KDECADE,KDECADE2,PCOVER,OCOVER,HSFTYPE,OECOSG)
 !     ##############################################################
 !
 !!**** *INIT_ISBA_MIXPAR* 
@@ -41,6 +41,7 @@
 !!
 !!    Original    16/11/10
 !!    P. Samuelsson  10/2014  MEB
+!!    A. Druel       02/2019  adapt the code to be compatible with irrigation (and new parameters)
 !!
 !----------------------------------------------------------------------------
 !
@@ -57,10 +58,12 @@ USE MODD_SURF_PAR,       ONLY : XUNDEF
 USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE, NVEGTYPE_OLD, NVEGTYPE_ECOSG
 !
 !
-USE MODD_DATA_COVER,     ONLY : XDATA_LAI, XDATA_H_TREE, XDATA_VEG,         &
-                                XDATA_IRRIG, XDATA_WATSUP, TDATA_SEED,      &
-                                TDATA_REAP
-!     
+USE MODD_DATA_COVER,     ONLY : XDATA_LAI, XDATA_H_TREE, XDATA_VEG,             &
+                                XDATA_IRRIGTYPE, XDATA_IRRIGFRAC, XDATA_WATSUP, &
+                                TDATA_SEED, TDATA_REAP 
+!
+USE MODD_AGRI,           ONLY : LIRRIGMODE
+!
 USE MODI_INI_DATA_PARAM
 USE MODI_AV_PGD
 !
@@ -83,6 +86,7 @@ INTEGER,                INTENT(OUT)   :: KDECADE2
 REAL, DIMENSION(:,:),   INTENT(IN)    :: PCOVER
 LOGICAL, DIMENSION(:),  INTENT(IN)    :: OCOVER
 CHARACTER(LEN=*),       INTENT(IN)    :: HSFTYPE ! nature / garden
+LOGICAL,                INTENT(IN)    :: OECOSG  ! ECOCLIMAP-SG activated ?
 !
 !
 !*    0.2    Declaration of local variables
@@ -94,9 +98,10 @@ REAL, DIMENSION(NVEGTYPE)   :: XSTRESS_NOAGRI   ! 1. if defensive /0. if offensi
 !
 CHARACTER(LEN=3)  :: YTREE, YNAT, YVEG
 !
-INTEGER               :: JVEG, JT, ji
+INTEGER               :: JVEG, JT
 !
 INTEGER               :: ISIZE_LMEB_PATCH  ! Number of patches with MEB=true
+!
 !
 !*    0.3    Declaration of namelists
 !            ------------------------
@@ -342,16 +347,28 @@ IF (ANY(DTV%LDATA_VEG)) THEN
   ENDIF
   !
   !
-  IF (.NOT.ANY(DTV%LDATA_IRRIG)) THEN
-    ALLOCATE(DTV%XPAR_IRRIG     (KDIM,DTV%NTIME,NVEGTYPE))
-    CALL AV_PGD(DTCO, DTV%XPAR_IRRIG(:,KDECADE2,:),PCOVER,XDATA_IRRIG(:,:),YVEG,'ARI',OCOVER,KDECADE=KDECADE)
-    DTV%LDATA_IRRIG(:)=.TRUE.
+  IF (.NOT.ANY(DTV%LDATA_IRRIGTYPE)) THEN
+    ALLOCATE(DTV%XPAR_IRRIGTYPE  (KDIM,NVEGTYPE))
+    IF ( OECOSG ) THEN
+      CALL AV_PGD(DTCO, DTV%XPAR_IRRIGTYPE(:,:),PCOVER,XDATA_IRRIGTYPE(:,:),YVEG,'MA1',OCOVER,KDECADE=KDECADE)
+    ELSE
+      CALL AV_PGD(DTCO, DTV%XPAR_IRRIGTYPE(:,:),PCOVER,XDATA_IRRIGTYPE(:,:),YVEG,'MAJ',OCOVER,KDECADE=KDECADE)
+    ENDIF
+    DTV%LDATA_IRRIGTYPE(:)=.TRUE.
   ENDIF
   !
   IF (.NOT.ANY(DTV%LDATA_WATSUP)) THEN
     ALLOCATE(DTV%XPAR_WATSUP     (KDIM,DTV%NTIME,NVEGTYPE))
     CALL AV_PGD(DTCO, DTV%XPAR_WATSUP(:,KDECADE2,:),PCOVER,XDATA_WATSUP(:,:),YVEG,'ARI',OCOVER,KDECADE=KDECADE)
     DTV%LDATA_WATSUP(:)=.TRUE.
+  ENDIF
+  !
+  IF (LIRRIGMODE) THEN
+    IF (.NOT.ANY(DTV%LDATA_IRRIGFRAC)) THEN
+      ALLOCATE(DTV%XPAR_IRRIGFRAC(KDIM,NVEGTYPE))
+      CALL AV_PGD(DTCO, DTV%XPAR_IRRIGFRAC(:,:),PCOVER,XDATA_IRRIGFRAC(:,:),YVEG,'ARV',OCOVER,KDECADE=KDECADE)
+      DTV%LDATA_IRRIGFRAC(:)=.TRUE.
+    ENDIF
   ENDIF
   !
   ALLOCATE(TPWORK(KDIM,NVEGTYPE))

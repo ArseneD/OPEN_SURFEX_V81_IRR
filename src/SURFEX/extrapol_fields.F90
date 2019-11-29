@@ -11,7 +11,7 @@ SUBROUTINE EXTRAPOL_FIELDS (DTCO, DTV, KDIM, IO, S, UG, U, HPROGRAM,KLUOUT)
 !!
 !!    METHOD
 !!    ------ 
-!!  these parameters are: LAI, HT, DG, ROOTFRAC, IRRIG, WATSUP
+!!  these parameters are: LAI, HT, DG, ROOTFRAC, WATSUP, THRESHOLD, SEED, REAP
 !!  Parameters are calculated as in ecoclimap, by vegtype, and then extrapolated
 !
 !!    EXTERNAL
@@ -32,21 +32,22 @@ SUBROUTINE EXTRAPOL_FIELDS (DTCO, DTV, KDIM, IO, S, UG, U, HPROGRAM,KLUOUT)
 !!    ------------
 !!
 !!    Original    16/11/10
-!!    R. Alkama     04/12 : add 6 new tree vegtype (9 instead 3)
+!!    R. Alkama    04/2012 : add 6 new tree vegtype (9 instead 3)
+!!    A. Druel     02/2019 : adapt the code to be compatible with irrigation: change flag and parameters
 !!
 !!    DECLARATIONS
 !!
 !
 !
-USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
-USE MODD_DATA_ISBA_n, ONLY : DATA_ISBA_t
-USE MODD_ISBA_OPTIONS_n, ONLY : ISBA_OPTIONS_t
-USE MODD_ISBA_n, ONLY : ISBA_S_t
+USE MODD_DATA_COVER_n,    ONLY : DATA_COVER_t
+USE MODD_DATA_ISBA_n,     ONLY : DATA_ISBA_t
+USE MODD_ISBA_OPTIONS_n,  ONLY : ISBA_OPTIONS_t
+USE MODD_ISBA_n,          ONLY : ISBA_S_t
 USE MODD_SURF_ATM_GRID_n, ONLY : SURF_ATM_GRID_t
-USE MODD_SURF_ATM_n, ONLY : SURF_ATM_t
+USE MODD_SURF_ATM_n,      ONLY : SURF_ATM_t
 !
 USE MODD_TYPE_DATE_SURF
-USE MODD_AGRI,        ONLY : LAGRIP
+USE MODD_AGRI,           ONLY : LAGRIP, LIRRIGMODE
 USE MODD_TREEDRAG,       ONLY : LTREEDRAG
 !
 USE MODD_SURF_PAR,       ONLY : XUNDEF
@@ -56,7 +57,7 @@ USE MODD_REPROD_OPER,    ONLY : CDGDIF, CDGAVG
 USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE, NVT_NO, NVT_ROCK, NVT_SNOW, JPCOVER
 !
 USE MODD_DATA_COVER,     ONLY : XDATA_LAI, XDATA_H_TREE,                      &
-                                XDATA_IRRIG, XDATA_WATSUP,                    &
+                                XDATA_WATSUP, XDATA_F2THRESHOLD,              &
                                 XDATA_GARDEN, XDATA_NATURE,                   &
                                 XDATA_ROOT_DEPTH,XDATA_GROUND_DEPTH,          &
                                 XDATA_ROOT_EXTINCTION, XDATA_ROOT_LIN,        &
@@ -76,15 +77,15 @@ IMPLICIT NONE
 !            ------------------------
 !
 !
-TYPE(DATA_COVER_t), INTENT(INOUT) :: DTCO
-TYPE(DATA_ISBA_t), INTENT(INOUT) :: DTV
-INTEGER, INTENT(IN) :: KDIM
-TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
-TYPE(ISBA_S_t), INTENT(INOUT) :: S
+TYPE(DATA_COVER_t),    INTENT(INOUT) :: DTCO
+TYPE(DATA_ISBA_t),     INTENT(INOUT) :: DTV
+INTEGER,               INTENT(IN)    :: KDIM
+TYPE(ISBA_OPTIONS_t),  INTENT(INOUT) :: IO
+TYPE(ISBA_S_t),        INTENT(INOUT) :: S
 TYPE(SURF_ATM_GRID_t), INTENT(INOUT) :: UG
-TYPE(SURF_ATM_t), INTENT(INOUT) :: U
+TYPE(SURF_ATM_t),      INTENT(INOUT) :: U
 !
- CHARACTER(LEN=6),       INTENT(IN)    :: HPROGRAM  ! host program
+ CHARACTER(LEN=6),      INTENT(IN)    :: HPROGRAM  ! host program
 INTEGER,                INTENT(IN)    :: KLUOUT
 !
 !
@@ -252,8 +253,8 @@ IF (IO%CALBEDO=='CM13') THEN
     DO JTIME=1,36 
 !     ECOCLIMAP spatial distribution field
       IF (ASSOCIATED(DTCO%XDATA_WEIGHT)) DEALLOCATE(DTCO%XDATA_WEIGHT)
-      CALL AV_PGD(DTCO,ZWORK(:,JTIME,:),S%XCOVER,XDATA_ALB_VEG_NIR(:,JTIME,:),YVEG,'ARI',S%LCOVER,KDECADE=JTIME)
- 
+      CALL AV_PGD(DTCO,ZWORK(:,JTIME,:),S%XCOVER,XDATA_ALB_VEG_NIR(:,JTIME,:), &
+              YVEG,'ARI',S%LCOVER,KDECADE=JTIME)
 !     Extrapolation toward new vegtype distribution field from updated land-use map or user 
       CALL INI_VAR_FROM_VEGTYPE_DATA(DTCO, DTV, UG, U, &
                                      HPROGRAM,KLUOUT,'ALBNIR_VEG',ZWORK(:,JTIME,:),PDEF=ZDEF)
@@ -267,8 +268,8 @@ IF (IO%CALBEDO=='CM13') THEN
     DO JTIME=1,36 
 !     ECOCLIMAP spatial distribution field
       IF (ASSOCIATED(DTCO%XDATA_WEIGHT)) DEALLOCATE(DTCO%XDATA_WEIGHT)
-      CALL AV_PGD(DTCO,ZWORK(:,JTIME,:),S%XCOVER,XDATA_ALB_VEG_VIS(:,JTIME,:),YVEG,'ARI',S%LCOVER,KDECADE=JTIME)
- 
+      CALL AV_PGD(DTCO,ZWORK(:,JTIME,:),S%XCOVER,XDATA_ALB_VEG_VIS(:,JTIME,:), &
+              YVEG,'ARI',S%LCOVER,KDECADE=JTIME)
 !     Extrapolation toward new vegtype distribution field from updated land-use map or user 
       CALL INI_VAR_FROM_VEGTYPE_DATA(DTCO, DTV, UG, U, &
                                      HPROGRAM,KLUOUT,'ALBVIS_VEG',ZWORK(:,JTIME,:),PDEF=ZDEF)
@@ -282,7 +283,8 @@ IF (IO%CALBEDO=='CM13') THEN
     DO JTIME=1,36 
 !     ECOCLIMAP spatial distribution field
       IF (ASSOCIATED(DTCO%XDATA_WEIGHT)) DEALLOCATE(DTCO%XDATA_WEIGHT)
-      CALL AV_PGD(DTCO,ZWORK(:,JTIME,:),S%XCOVER,XDATA_ALB_SOIL_NIR(:,JTIME,:),YBAR,'ARI',S%LCOVER,KDECADE=JTIME)
+      CALL AV_PGD(DTCO,ZWORK(:,JTIME,:),S%XCOVER,XDATA_ALB_SOIL_NIR(:,JTIME,:), &
+              YBAR,'ARI',S%LCOVER,KDECADE=JTIME)
  
 !     Extrapolation toward new vegtype distribution field from updated land-use map or user 
       CALL INI_VAR_FROM_VEGTYPE_DATA(DTCO, DTV, UG, U, &
@@ -297,7 +299,8 @@ IF (IO%CALBEDO=='CM13') THEN
     DO JTIME=1,36 
 !     ECOCLIMAP spatial distribution field
       IF (ASSOCIATED(DTCO%XDATA_WEIGHT)) DEALLOCATE(DTCO%XDATA_WEIGHT)
-      CALL AV_PGD(DTCO,ZWORK(:,JTIME,:),S%XCOVER,XDATA_ALB_SOIL_VIS(:,JTIME,:),YBAR,'ARI',S%LCOVER,KDECADE=JTIME)
+      CALL AV_PGD(DTCO,ZWORK(:,JTIME,:),S%XCOVER,XDATA_ALB_SOIL_VIS(:,JTIME,:), &
+              YBAR,'ARI',S%LCOVER,KDECADE=JTIME)
  
 !     Extrapolation toward new vegtype distribution field from updated land-use map or user 
       CALL INI_VAR_FROM_VEGTYPE_DATA(DTCO, DTV, UG, U, &
@@ -310,28 +313,8 @@ IF (IO%CALBEDO=='CM13') THEN
 ENDIF
 !
 IF(IO%CPHOTO=='NIT' .OR. IO%CPHOTO=='NCB') THEN
-  !      
-  IF (LAGRIP) THEN
-    !
-    !  IRRIG
-    !  -----
-    IF (.NOT.ANY(DTV%LDATA_IRRIG)) THEN
-      ZDEF(:)=0.
-      ALLOCATE(DTV%XPAR_IRRIG       (KDIM,DTV%NTIME,NVEGTYPE))
-      DO JTIME=1,36
-        !   ECOCLIMAP spatial distribution field      
-        IF (ASSOCIATED(DTCO%XDATA_WEIGHT)) DEALLOCATE(DTCO%XDATA_WEIGHT)
-        CALL AV_PGD(DTCO,ZWORK(:,JTIME,:),S%XCOVER,XDATA_IRRIG,YVEG,'ARI',S%LCOVER,KDECADE=JTIME)
-        !   Extrapolation toward new vegtype distribution field from updated land-use map or user  
-        CALL INI_VAR_FROM_VEGTYPE_DATA(DTCO, DTV, UG, U, &
-                                       HPROGRAM,KLUOUT,'IRRIG  ', ZWORK(:,JTIME,:), PDEF=ZDEF)
-      ENDDO
-      !
-      CALL GOTO_NTIME(DTV%NTIME,ZWORK,DTV%XPAR_IRRIG)
-      !
-      DTV%LDATA_IRRIG(:)=.TRUE.
-      !
-    ENDIF
+  ! 
+  IF ( LIRRIGMODE ) THEN
     !
     !   WATSUP
     !   ------
@@ -352,9 +335,33 @@ IF(IO%CPHOTO=='NIT' .OR. IO%CPHOTO=='NCB') THEN
       DTV%LDATA_WATSUP(:)=.TRUE.
     ENDIF
     !
+    ! F2THRESHOLD
+    ! -----------
+    IF (.NOT.ANY(DTV%LDATA_F2THRESHOLD))  THEN
+      ZDEF(:)=0.
+      ALLOCATE(DTV%XPAR_F2THRESHOLD(KDIM,DTV%NTIME,NVEGTYPE))
+      DO JTIME=1,36
+        !   ECOCLIMAP spatial distribution field
+        IF (ASSOCIATED(DTCO%XDATA_WEIGHT)) DEALLOCATE(DTCO%XDATA_WEIGHT)
+        CALL AV_PGD(DTCO,ZWORK(:,JTIME,:),S%XCOVER,XDATA_F2THRESHOLD(:,JTIME,:),YVEG,'ARI',S%LCOVER,KDECADE=JTIME)
+        !   Extrapolation toward new vegtype distribution field from updated land-use map or user  
+        CALL INI_VAR_FROM_VEGTYPE_DATA(DTCO, DTV, UG, U, &
+                                       HPROGRAM,KLUOUT,'F2THRESHOLD', ZWORK(:,JTIME,:), PDEF=ZDEF)
+      ENDDO
+      !
+      CALL GOTO_NTIME(DTV%NTIME,ZWORK,DTV%XPAR_F2THRESHOLD)
+      !  
+      DTV%LDATA_F2THRESHOLD(:)=.TRUE.
+    ENDIF
+  ENDIF
+  !
+  IF ( LAGRIP .OR. LIRRIGMODE ) THEN
+    !
+    ! REAP & SEED
+    ! -----------
     ALLOCATE(TPWORK(KDIM,NVEGTYPE))
     !
-    IF (.NOT.ANy(DTV%LDATA_SEED_M).OR..NOT.ANY(DTV%LDATA_SEED_D)) THEN
+    IF (.NOT.ANY(DTV%LDATA_SEED_M).OR..NOT.ANY(DTV%LDATA_SEED_D)) THEN
       ALLOCATE(DTV%XPAR_SEED_M(KDIM,NVEGTYPE))
       ALLOCATE(DTV%XPAR_SEED_D(KDIM,NVEGTYPE))
       IF (ASSOCIATED(DTCO%XDATA_WEIGHT)) DEALLOCATE(DTCO%XDATA_WEIGHT)        

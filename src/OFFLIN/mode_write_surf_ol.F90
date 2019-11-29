@@ -238,8 +238,8 @@ IMPLICIT NONE
 !
  CHARACTER(LEN=*), DIMENSION(:), INTENT(IN) :: HSELECT
  CHARACTER(LEN=12),  INTENT(IN)  :: HREC     ! name of the article to be read
- CHARACTER(LEN=40),  INTENT(IN)  :: HFIELD   ! the integer scalar to be read
-INTEGER,            INTENT(OUT) :: KRESP    ! KRESP  : return-code if a problem appears
+ CHARACTER(LEN=160), INTENT(IN)  :: HFIELD   ! the integer scalar to be read
+INTEGER,             INTENT(OUT) :: KRESP    ! KRESP  : return-code if a problem appears
  CHARACTER(LEN=100), INTENT(IN)  :: HCOMMENT
 !
 !*      0.2   Declarations of local variables

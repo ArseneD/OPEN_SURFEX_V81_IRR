@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-SUBROUTINE PREP_TOWN (DTCO, UG, U, USS, GCP, TM, GDM, GRM, &
+SUBROUTINE PREP_TOWN (DTCO, UG, U, USS, GCP, TM, GDM, GRM, NPAR_VEG_IRR_USE, &
                       HPROGRAM,HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,YDCTL)
 !     #################################################################################
 !
@@ -27,6 +27,8 @@ SUBROUTINE PREP_TOWN (DTCO, UG, U, USS, GCP, TM, GDM, GRM, &
 !!    -------------
 !!      Original    01/2004
 !!      P. Marguinaud10/2014, Support for a 2-part PREP
+!!      A. Druel     02/2019, Transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !!------------------------------------------------------------------
 !
 !
@@ -62,7 +64,8 @@ TYPE(TEB_GARDEN_MODEL_t), INTENT(INOUT) :: GDM
 TYPE(TEB_GREENROOF_MODEL_t), INTENT(INOUT) :: GRM
 TYPE (PREP_CTL),    INTENT(INOUT) :: YDCTL
 !
- CHARACTER(LEN=6),   INTENT(IN)  :: HPROGRAM  ! program calling surf. schemes
+INTEGER,DIMENSION(:),INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
+ CHARACTER(LEN=6),   INTENT(IN)  :: HPROGRAM    ! program calling surf. schemes
  CHARACTER(LEN=28),  INTENT(IN)  :: HATMFILE    ! name of the Atmospheric file
  CHARACTER(LEN=6),   INTENT(IN)  :: HATMFILETYPE! type of the Atmospheric file
  CHARACTER(LEN=28),  INTENT(IN)  :: HPGDFILE    ! name of the Atmospheric file
@@ -76,7 +79,7 @@ REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
 IF (LHOOK) CALL DR_HOOK('PREP_TOWN',0,ZHOOK_HANDLE)
 IF (U%CTOWN=='TEB   ') THEN
-  CALL PREP_TEB(DTCO, UG, U, USS, GCP, TM%TOP, TM%BOP, TM%NB, TM%G, TM%SB, TM%NT, GDM, GRM, &
+  CALL PREP_TEB(DTCO, UG, U, USS, GCP, TM%TOP, TM%BOP, TM%NB, TM%G, TM%SB, TM%NT, GDM, GRM, NPAR_VEG_IRR_USE, &
                      HPROGRAM,HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,YDCTL)
 END IF
 IF (LHOOK) CALL DR_HOOK('PREP_TOWN',1,ZHOOK_HANDLE)

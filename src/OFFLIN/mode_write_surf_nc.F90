@@ -208,8 +208,8 @@ IMPLICIT NONE
  CHARACTER(LEN=*), DIMENSION(:), INTENT(IN) :: HSELECT
 !
  CHARACTER(LEN=12),  INTENT(IN)  :: HREC     ! name of the article to be read
- CHARACTER(LEN=40),  INTENT(IN)  :: HFIELD   ! the integer scalar to be read
-INTEGER,            INTENT(OUT) :: KRESP    ! KRESP  : return-code if a problem appears
+ CHARACTER(LEN=160), INTENT(IN)  :: HFIELD   ! the integer scalar to be read
+INTEGER,             INTENT(OUT) :: KRESP    ! KRESP  : return-code if a problem appears
  CHARACTER(LEN=100), INTENT(IN)  :: HCOMMENT
 !
 !*      0.2   Declarations of local variables
@@ -783,6 +783,7 @@ IF (NRANK==NPIO) THEN
   IRET(5)=NF90_PUT_VAR(NID_NC,IVAR_ID,ZTAB2D,ISTART,ICOUNT)
   CALL HANDLE_ERR(IRET(5),HREC)  
 ENDIF
+
 !
 IF (LHOOK) CALL DR_HOOK('MODE_WRITE_SURF_NC:WRITE_SURFX2_NC:WRITE_DATAX2_NC',1,ZHOOK_HANDLE)
 !

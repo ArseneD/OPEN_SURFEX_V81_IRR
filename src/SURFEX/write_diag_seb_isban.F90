@@ -40,6 +40,8 @@
 !!                            when coupled with ARPEGE/ALADIN/AROME
 !!      P. Samuelsson 10/2014 MEB
 !!      B. Decharme 02/2016 : NBLOCK instead of LCOUNTW for compilation in AAA
+!!      A. Druel    02/2019 : Change LAGRIP to LIRRIGMODE flag... for irrigation associated parameters
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
@@ -71,7 +73,7 @@ USE MODD_CSTS,       ONLY : XRHOLW, XTT, XLMTT
 !
 USE MODD_DST_SURF
 !
-USE MODD_AGRI,     ONLY : LAGRIP
+USE MODD_AGRI,     ONLY : LIRRIGMODE
 !
 USE MODE_DIAG
 !
@@ -980,7 +982,7 @@ YRECFM='SNOMLT'//TRIM(HTERM)
 YCOMMENT='snow melting rate'//' (Kg/m2/s)'
 CALL WRITE_SURF(DUO%CSELECT, HPROGRAM,YRECFM,DEA%XMELT(:),IRESP,HCOMMENT=YCOMMENT)
   !
-IF(LAGRIP)THEN
+IF(LIRRIGMODE)THEN
   YRECFM='IRRIG'//TRIM(HTERM)
   YCOMMENT='irrigation rate'//' (Kg/m2/s)'
   CALL WRITE_SURF(DUO%CSELECT, HPROGRAM,YRECFM,DEA%XIRRIG_FLUX(:),IRESP,HCOMMENT=YCOMMENT)
@@ -1517,7 +1519,7 @@ IF (ISIZE_LMEB_PATCH>0) THEN
 ENDIF
 ! END MEB STUFF
 !
-IF(LAGRIP)THEN
+IF(LIRRIGMODE)THEN
   YRECFM='IRRIG'//TRIM(HTERM)
   YCOMMENT='X_Y_'//YRECFM//' (Kg/m2/s)'
   DO JP=1,IO%NPATCH

@@ -25,6 +25,7 @@ SUBROUTINE WRITE_DIAG_ISBA_n (DTCO, DUO, U, IM, NDST,  HPROGRAM, HWRITE)
 !!    MODIFICATIONS
 !!    -------------
 !!      Original    01/2004
+!!      A. Druel    02/2019 Change CALL of WRITE_DIAG_MISC_ISBA_n
 !!------------------------------------------------------------------
 !
 USE MODD_SURFEX_MPI, ONLY : NRANK, NPIO
@@ -73,7 +74,7 @@ IF (HWRITE/='PGD') THEN
                                IM%O, IM%S, IM%NP, IM%NPE, HPROGRAM)
     CALL WRITE_DIAG_MISC_ISBA_n(DTCO, DUO%CSELECT, DUO%LSNOWDIMNC, U, IM%ID%O%LPATCH_BUDGET, &
                                 IM%ID%D, IM%ID%ND, IM%ID%DM, IM%ID%NDM, IM%O, IM%S, IM%K,    &
-                                IM%NP, IM%NPE%AL(1)%TSNOW, HPROGRAM)
+                                IM%NP, IM%NPE, IM%NAG, IM%NPE%AL(1)%TSNOW, HPROGRAM)
   END IF
 END IF
 !

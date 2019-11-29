@@ -57,8 +57,7 @@ SUBROUTINE NITRO_DECLINE(IO, PK, PEK, OWOOD, PBSLAI_NITRO, PLAT, PBIOMASS_LEAF )
 !!      B.   Decharme 05/2012: Optimization
 !!                              ZCC_NITRO and ZBIOMASST_LIM in modd_co2v_par.F90
 !!      C.   Delire   01/2014 : sapwood respiration from IBIS
-
-!
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.     DECLARATIONS
@@ -70,9 +69,6 @@ USE MODD_ISBA_n, ONLY : ISBA_P_t, ISBA_PE_t
 USE MODD_CSTS,           ONLY : XPI, XDAY
 USE MODD_CO2V_PAR,       ONLY : XPCCO2, XCC_NIT, XCA_NIT, XMC, &
                                 XMCO2, XCC_NITRO, XBIOMASST_LIM 
-USE MODD_DATA_COVER_PAR, ONLY : NVT_TEBD, NVT_BONE, NVT_TRBE, NVT_TRBD, &
-                                NVT_TEBE, NVT_TENE, NVT_BOBD, NVT_BOND, &
-                                NVT_SHRB
 !
 USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 USE PARKIND1  ,ONLY : JPRB

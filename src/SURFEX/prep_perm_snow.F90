@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-SUBROUTINE PREP_PERM_SNOW (IO, KK, PK, PEK)
+SUBROUTINE PREP_PERM_SNOW (IO, KK, PK, PEK, NPAR_VEG_IRR_USE)
 !          ################################################
 !
 !
@@ -30,6 +30,8 @@ SUBROUTINE PREP_PERM_SNOW (IO, KK, PK, PEK)
 !!                                          snow/ice treatment
 !!      B. Decharme 07/2012: 3-L or Crocus adjustments
 !!      M. Lafaysse 09/2012: adaptation with new snow age in Crocus
+!!      A. Druel    02/2019: adapt the code to be compatible with irrigation (and new patches)
+!!
 !!------------------------------------------------------------------
 !
 USE MODD_SURFEX_MPI, ONLY : NRANK, NPIO, NCOMM, NPROC
@@ -39,7 +41,7 @@ USE MODD_ISBA_n, ONLY : ISBA_K_t, ISBA_P_t, ISBA_PE_t
 !
 USE MODD_TYPE_SNOW
 USE MODD_CSTS,           ONLY : XTT
-USE MODD_DATA_COVER_PAR, ONLY : NVT_SNOW
+USE MODD_DATA_COVER_PAR, ONLY : NVT_SNOW, NVEGTYPE
 USE MODD_SNOW_PAR,       ONLY : XRHOSMAX, XANSMAX, XANSMIN, &
                                 XAGLAMAX, XAGLAMIN, XHGLA,  &
                                 XRHOSMAX_ES
@@ -67,9 +69,10 @@ INCLUDE "mpif.h"
 !
 !
 TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
-TYPE(ISBA_K_t), INTENT(INOUT) :: KK
-TYPE(ISBA_P_t), INTENT(INOUT) :: PK
-TYPE(ISBA_PE_t), INTENT(INOUT) :: PEK
+TYPE(ISBA_K_t), INTENT(INOUT)       :: KK
+TYPE(ISBA_P_t), INTENT(INOUT)       :: PK
+TYPE(ISBA_PE_t), INTENT(INOUT)      :: PEK
+INTEGER,DIMENSION(:),   INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 !*      0.2    declarations of local parameter
 !
@@ -82,7 +85,7 @@ REAL, DIMENSION(:),   ALLOCATABLE   :: ZWSNOW_PERM ! snow total reservoir due to
 REAL, DIMENSION(:),   ALLOCATABLE   :: ZWSNOW      ! initial snow total reservoir
 REAL, DIMENSION(:),   ALLOCATABLE   :: ZD          ! new snow total depth
 REAL, DIMENSION(:,:), ALLOCATABLE   :: ZDEPTH      ! depth of each layer
-REAL, DIMENSION(:,:), ALLOCATABLE :: ZT          ! new snow temperature profile
+REAL, DIMENSION(:,:), ALLOCATABLE   :: ZT          ! new snow temperature profile
 REAL, DIMENSION(:),   ALLOCATABLE   :: ZPSN        ! permanent snow fraction
 REAL, DIMENSION(:,:), ALLOCATABLE   :: ZWAT        ! 
 !
@@ -94,6 +97,9 @@ INTEGER, DIMENSION(MPI_STATUS_SIZE) :: ISTATUS
 #endif
 INTEGER :: INFOMPI
 INTEGER :: ISNOW          ! patch number where permanent snow is
+!
+REAL, DIMENSION(SIZE(PK%XVEGTYPE_PATCH,1)):: ZVEG_SNOW
+INTEGER                                   :: JTYPE, JTYPE2
 !
 REAL, DIMENSION(0:NPROC-1) :: ZPSN0
 REAL :: ZSUM_PSN
@@ -119,8 +125,15 @@ IF(PEK%TSNOW%SCHEME=='3-L'.OR.PEK%TSNOW%SCHEME=='CRO')THEN
 ENDIF
 !
 ALLOCATE(ZPSN(SIZE(PEK%XTG,1)))
-
-ZPSN(:) = MIN ( PK%XVEGTYPE_PATCH(:,NVT_SNOW) , 0.9999 )
+!
+ZVEG_SNOW(:) = 0.
+DO JTYPE = 1, SIZE(PK%XVEGTYPE_PATCH,2)
+  JTYPE2 = JTYPE
+  IF (JTYPE > NVEGTYPE) JTYPE2 = NPAR_VEG_IRR_USE( JTYPE - NVEGTYPE )
+  IF ( JTYPE2 == NVT_SNOW ) ZVEG_SNOW(:) = ZVEG_SNOW(:) + PK%XVEGTYPE_PATCH(:,JTYPE)
+ENDDO
+!
+ZPSN(:) = MIN ( ZVEG_SNOW(:) , 0.9999 )
 !
 !* if no permanent snow present
 !
@@ -376,7 +389,7 @@ IF(IO%LGLACIER)THEN
   ENDIF
 !
   DO JL=1,IWORK
-     WHERE(PK%XVEGTYPE_PATCH(:,NVT_SNOW)>0.0)
+     WHERE(ZVEG_SNOW>0.0)
        PEK%XWGI(:,JL) = MAX(PEK%XWGI(:,JL),ZWAT(:,JL)*ZPSN(:))
        PEK%XWG (:,JL) = MIN(PEK%XWG (:,JL), MAX(KK%XWSAT(:,JL)-PEK%XWGI(:,JL),XWGMIN))
      END WHERE

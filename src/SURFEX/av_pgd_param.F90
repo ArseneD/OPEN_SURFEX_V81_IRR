@@ -4,7 +4,7 @@
 !SFX_LIC for details. version 1.
 !     ################################################################
       SUBROUTINE AV_PGD_PARAM (PLAI_IN, PVEG_IN, &
-                               PFIELD,PVEGTYPE,PDATA,HSFTYPE,HATYPE,KMASK,KNPATCH,KPATCH,PDZ,KDECADE)
+                               PFIELD,PVEGTYPE,PDATA,NPAR_VEG_IRR_USE,HSFTYPE,HATYPE,KMASK,KNPATCH,KPATCH,PDZ,KDECADE)
 !     ################################################################
 !
 !!**** *AV_PATCH_PGD* average for each surface patch a secondary physiographic 
@@ -50,6 +50,7 @@
 !!    Original    15/12/97
 !!    V. Masson   01/2004  Externalization
 !!    R. Alkama   04/2012  add 6 new tree vegtype (9 instead 3)
+!!    A. Druel    02/2019  Compatibility with new irrigation (duplication of patches) and add MA1 and ARV possibility (without taking into account the zeros)
 !
 !----------------------------------------------------------------------------
 !
@@ -60,8 +61,9 @@ USE MODD_SURF_PAR,       ONLY : XUNDEF, NUNDEF
 USE MODD_DATA_COVER_PAR, ONLY : NVT_TEBD, NVT_BONE, NVT_TRBE, NVT_TRBD, NVT_TEBE,  &
                                 NVT_TENE, NVT_BOBD, NVT_BOND, NVT_SHRB, NVEGTYPE,  &
                                 XCDREF
+USE MODD_AGRI,           ONLY : NVEG_IRR
 !
-USE MODI_VEGTYPE_TO_PATCH 
+USE MODI_VEGTYPE_TO_PATCH_IRRIG 
 !
 USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 USE PARKIND1  ,ONLY : JPRB
@@ -77,9 +79,10 @@ IMPLICIT NONE
 REAL, DIMENSION(:,:,:), INTENT(IN) :: PLAI_IN
 REAL, DIMENSION(:,:,:), INTENT(IN) :: PVEG_IN
 !
-REAL, DIMENSION(:), INTENT(OUT) :: PFIELD  ! secondary field to construct
+REAL, DIMENSION(:),   INTENT(OUT) :: PFIELD  ! secondary field to construct
 REAL, DIMENSION(:,:), INTENT(IN)  :: PVEGTYPE  ! fraction of each cover class
 REAL, DIMENSION(:,:), INTENT(IN)  :: PDATA   ! secondary field value for each class
+INTEGER,DIMENSION(:), INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
  CHARACTER(LEN=3),     INTENT(IN)  :: HSFTYPE ! Type of surface where the field
                                                ! is defined
  CHARACTER(LEN=3),     INTENT(IN) :: HATYPE  ! Type of averaging
@@ -99,18 +102,18 @@ INTEGER :: JCOVER  ! loop on cover classes
 ! nbe of vegtype
 ! nbre of patches
 INTEGER :: JV! loop on vegtype
-INTEGER :: JJ, JI, JP, IMASK
+INTEGER :: JJ, JI, JP, JK, IMASK
 !
-REAL, DIMENSION(SIZE(PFIELD,1),NVEGTYPE)  :: ZWEIGHT
+REAL, DIMENSION(SIZE(PFIELD,1),NVEGTYPE+NVEG_IRR)  :: ZWEIGHT
 !
 REAL, DIMENSION(SIZE(PFIELD,1))   :: ZSUM_WEIGHT_PATCH
 !
 REAL, DIMENSION(SIZE(PFIELD,1))   :: ZWORK
 REAL, DIMENSION(SIZE(PFIELD,1))   :: ZDZ
 !
-REAL, DIMENSION(0:31) :: ZCOUNT
+REAL, DIMENSION(0:31) :: ZCOUNT       !! ! Take care: MAJ or MA1 are valable only from 0 to 31.
 INTEGER, DIMENSION(SIZE(PFIELD,1))  :: NMASK
-INTEGER ::  PATCH_LIST(NVEGTYPE)
+INTEGER ::  PATCH_LIST(NVEGTYPE+NVEG_IRR)
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 
 !-------------------------------------------------------------------------------
@@ -140,8 +143,8 @@ ZWORK(:)=0.
 ZWEIGHT(:,:)=0.
 ZSUM_WEIGHT_PATCH(:)=0.
 !
-DO JV=1,NVEGTYPE
-  PATCH_LIST(JV) = VEGTYPE_TO_PATCH (JV, KNPATCH)
+DO JV=1,NVEGTYPE+NVEG_IRR
+  CALL VEGTYPE_TO_PATCH_IRRIG(JV,KNPATCH,NPAR_VEG_IRR_USE,PATCH_LIST(JV))
 ENDDO
 
 !-------------------------------------------------------------------------------
@@ -150,26 +153,30 @@ ENDDO
 !*    2.     Selection of the weighting function for vegtype
 !            -----------------------------------
 !
-DO JV=1,NVEGTYPE
+DO JV=1,NVEGTYPE+NVEG_IRR
   JP= PATCH_LIST(JV)
   IF (JP/=KPATCH) CYCLE
+  !
+  JK = JV
+  IF (JV > NVEGTYPE) JK = NPAR_VEG_IRR_USE( JV - NVEGTYPE )
+  !
   DO JI=1,SIZE(PFIELD)
     IMASK = KMASK(JI)
     
     IF (HSFTYPE=='NAT'.OR.HSFTYPE=='GRD') THEN
       ZWEIGHT(JI,JV) = PVEGTYPE(IMASK,JV)
     ELSEIF (HSFTYPE=='VEG'.OR.HSFTYPE=='GRV') THEN
-      ZWEIGHT(JI,JV) = PVEGTYPE(IMASK,JV)*PVEG_IN(IMASK,KDECADE,JV)
+      ZWEIGHT(JI,JV) = PVEGTYPE(IMASK,JV)*PVEG_IN(IMASK,KDECADE,JK)     ! PVEG_IN with JK: what is it ?
     ELSEIF (HSFTYPE=='BAR'.OR.HSFTYPE=='GRB') THEN
-      ZWEIGHT(JI,JV)=PVEGTYPE(IMASK,JV)*(1.-PVEG_IN(IMASK,KDECADE,JV))
+      ZWEIGHT(JI,JV)=PVEGTYPE(IMASK,JV)*(1.-PVEG_IN(IMASK,KDECADE,JK))  ! PVEG_IN with JK: what is it ?
     ELSEIF (HSFTYPE=='DVG'.OR.HSFTYPE=='GDV') THEN
-      IF (SUM(PLAI_IN(JI,:,JV)).GT.0.) ZWEIGHT(JI,JV) = PVEGTYPE(IMASK,JV)
+      IF (SUM(PLAI_IN(JI,:,JK)).GT.0.) ZWEIGHT(JI,JV) = PVEGTYPE(IMASK,JV)
     ELSEIF (HSFTYPE=='LAI'.OR.HSFTYPE=='GRL') THEN
-      IF (JV>=4) ZWEIGHT(JI,JV)=PVEGTYPE(IMASK,JV)*PLAI_IN(IMASK,KDECADE,JV)
+      IF (JV>=4) ZWEIGHT(JI,JV)=PVEGTYPE(IMASK,JV)*PLAI_IN(IMASK,KDECADE,JK)
     ELSEIF (HSFTYPE=='TRE'.OR.HSFTYPE=='GRT') THEN
-      IF (JV==NVT_TEBD.OR.JV==NVT_BONE.OR.JV==NVT_TRBE.OR.JV==NVT_TRBD.OR.&
-          JV==NVT_TEBE.OR.JV==NVT_TENE.OR.JV==NVT_BOBD.OR.JV==NVT_BOND.OR.&
-          JV==NVT_SHRB) ZWEIGHT(JI,JV) = PVEGTYPE(JI,JV)
+      IF (JK==NVT_TEBD.OR.JK==NVT_BONE.OR.JK==NVT_TRBE.OR.JK==NVT_TRBD.OR.&
+          JK==NVT_TEBE.OR.JK==NVT_TENE.OR.JK==NVT_BOBD.OR.JK==NVT_BOND.OR.&
+          JK==NVT_SHRB) ZWEIGHT(JI,JV) = PVEGTYPE(IMASK,JV)
     ELSE
       CALL ABOR1_SFX('AV_PGD_PARAM_1D: WEIGHTING FUNCTION FOR VEGTYPE NOT ALLOWED')
     ENDIF
@@ -195,15 +202,19 @@ SELECT CASE (HATYPE)
 !*    3.3    Arithmetic averaging
 !            --------------------
 !
-  CASE ('ARI')
+  CASE ('ARI', 'ARV')
 !
-    DO JV=1,NVEGTYPE
+    DO JV=1,NVEGTYPE+NVEG_IRR
       JP= PATCH_LIST(JV)
       IF (JP/=KPATCH) CYCLE
+      !
+      JK = JV
+      IF (JV > NVEGTYPE) JK = NPAR_VEG_IRR_USE( JV - NVEGTYPE )
+      !
       DO JJ=1,SIZE(PFIELD)
         IMASK = KMASK(JJ)
         ZSUM_WEIGHT_PATCH(JJ) = ZSUM_WEIGHT_PATCH(JJ) + ZWEIGHT(JJ,JV)
-        ZWORK(JJ) =  ZWORK(JJ) + PDATA(IMASK,JV)  * ZWEIGHT(JJ,JV)
+        ZWORK(JJ) =  ZWORK(JJ) + PDATA(IMASK,JK)  * ZWEIGHT(JJ,JV)
       ENDDO
     END DO
 !
@@ -214,17 +225,21 @@ SELECT CASE (HATYPE)
 !
   CASE('INV' )
 !
-   DO JV=1,NVEGTYPE 
-     JP=PATCH_LIST(JV) 
-     IF (JP/=KPATCH) CYCLE
-     DO JJ=1,SIZE(PFIELD)
-       IMASK = KMASK(JJ)     
-       ZSUM_WEIGHT_PATCH(JJ) = ZSUM_WEIGHT_PATCH(JJ)+ZWEIGHT(JJ,JV)
-       IF (PDATA(IMASK,JV).NE.0.) THEN
-         ZWORK(JJ)= ZWORK(JJ) + 1./ PDATA(IMASK,JV) * ZWEIGHT(JJ,JV)
-       ENDIF
-     ENDDO
-   END DO
+    DO JV=1,NVEGTYPE+NVEG_IRR 
+      JP=PATCH_LIST(JV) 
+      IF (JP/=KPATCH) CYCLE
+      !
+      JK = JV
+      IF (JV > NVEGTYPE) JK = NPAR_VEG_IRR_USE( JV - NVEGTYPE )
+      !
+      DO JJ=1,SIZE(PFIELD)
+        IMASK = KMASK(JJ)     
+        ZSUM_WEIGHT_PATCH(JJ) = ZSUM_WEIGHT_PATCH(JJ)+ZWEIGHT(JJ,JV)
+        IF (PDATA(IMASK,JK).NE.0.) THEN
+          ZWORK(JJ)= ZWORK(JJ) + 1./ PDATA(IMASK,JK) * ZWEIGHT(JJ,JV)
+        ENDIF
+      ENDDO
+    END DO
 !
 !-------------------------------------------------------------------------------!
 !
@@ -234,31 +249,42 @@ SELECT CASE (HATYPE)
 !
   CASE('CDN')
 !
-    DO JV=1,NVEGTYPE
+    DO JV=1,NVEGTYPE+NVEG_IRR
       JP=PATCH_LIST(JV)
       IF (JP/=KPATCH) CYCLE
+      !
+      JK = JV
+      IF (JV > NVEGTYPE) JK = NPAR_VEG_IRR_USE( JV - NVEGTYPE )
+      !
       DO JJ=1,SIZE(PFIELD)
         IMASK = KMASK(JJ)        
         ZSUM_WEIGHT_PATCH(JJ) =  ZSUM_WEIGHT_PATCH(JJ)+ ZWEIGHT(JJ,JV)
-        IF (PDATA(JJ,JV).NE.0.) THEN
-          ZWORK(JJ)= ZWORK(JJ) + 1./(LOG(ZDZ(JJ)/ PDATA(IMASK,JV)))**2    &
+        IF (PDATA(JJ,JK).NE.0.) THEN
+          ZWORK(JJ)= ZWORK(JJ) + 1./(LOG(ZDZ(JJ)/ PDATA(IMASK,JK)))**2    &
                             * ZWEIGHT(JJ,JV)
         ENDIF
       ENDDO
     END DO   
 !
-  CASE ('MAJ')
+  CASE ('MAJ', 'MA1')
 !
     ZWORK(:) = 0.
     DO JJ=1,SIZE(PFIELD)
       ZCOUNT(:) = 0.
-      DO JV=1,NVEGTYPE
+      DO JV=1,NVEGTYPE+NVEG_IRR
         JP= PATCH_LIST(JV)
         IF (JP/=KPATCH) CYCLE
+        !
+        JK = JV
+        IF (JV > NVEGTYPE) JK = NPAR_VEG_IRR_USE( JV - NVEGTYPE )
+        !
         IMASK = KMASK(JJ)
-        IF (NINT(PDATA(IMASK,JV))/=NUNDEF) &
-                ZCOUNT(NINT(PDATA(IMASK,JV))) = ZCOUNT(NINT(PDATA(IMASK,JV))) + ZWEIGHT(JJ,JV)
+        IF (PDATA(IMASK,JK)/=XUNDEF) THEN
+          IF (NINT(PDATA(IMASK,JK))/=NUNDEF) &
+                ZCOUNT(NINT(PDATA(IMASK,JK))) = ZCOUNT(NINT(PDATA(IMASK,JK))) + ZWEIGHT(JJ,JV)
+        ENDIF
       ENDDO
+      IF ( HATYPE == 'MA1' ) ZCOUNT(0)=0 ! don't take into account the "0" value
       IF (ALL(ZCOUNT(:)==0.)) THEN
         ZWORK(JJ) = NUNDEF
       ELSE
@@ -283,7 +309,7 @@ SELECT CASE (HATYPE)
 !*    4.2    Arithmetic averaging
 !            --------------------
 !
-  CASE ('ARI')
+  CASE ('ARI', 'ARV')
 !   
     DO JI=1,SIZE(PFIELD)
       IF (ZSUM_WEIGHT_PATCH(JI)>0.) PFIELD(JI) = ZWORK(JI) / ZSUM_WEIGHT_PATCH(JI)
@@ -313,8 +339,8 @@ SELECT CASE (HATYPE)
       ENDIF
     ENDDO
 !
-  CASE ('MAJ')
-!   
+  CASE ('MAJ', 'MA1')
+!
     DO JI=1,SIZE(PFIELD)
       PFIELD(JI) = ZWORK(JI)
     ENDDO

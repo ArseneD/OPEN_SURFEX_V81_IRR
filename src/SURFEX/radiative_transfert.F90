@@ -8,7 +8,7 @@ SUBROUTINE RADIATIVE_TRANSFERT(OAGRI_TO_GRASS, PVEGTYPE,          &
             PSW_RAD, PLAI, PZENITH, PABC,                         &
             PFAPARC, PFAPIRC, PMUS, PLAI_EFFC, OSHADE, PIACAN,    &             
             PIACAN_SUNLIT, PIACAN_SHADE, PFRAC_SUN,               &          
-            PFAPAR, PFAPIR, PFAPAR_BS, PFAPIR_BS                  ) 
+            PFAPAR, PFAPIR, PFAPAR_BS, PFAPIR_BS, NPAR_VEG_IRR_USE) 
 !   #########################################################################
 !
 !!****  *RADIATIVE_TRANSFERT*  
@@ -51,9 +51,10 @@ SUBROUTINE RADIATIVE_TRANSFERT(OAGRI_TO_GRASS, PVEGTYPE,          &
 !!
 !!    MODIFICATIONS
 !!    -------------
-!!     Original    04/11 
-!!     C. Delire   08/13 : moved calculation of diffuse fraction from fapair to here
-!!     Commented by C. Delire 07/13
+!!     Original    04/2011 
+!!     C. Delire   08/2013 : moved calculation of diffuse fraction from fapair to here
+!!     Commented by C. Delire 07/2013
+!!     A. Druel    02/2019 : adapt the code to be compatible with irrigation (and new patches)
 !!
 !-------------------------------------------------------------------------------
 !!
@@ -116,6 +117,8 @@ REAL, DIMENSION(:,:), INTENT(OUT) :: PFRAC_SUN   ! fraction of sunlit leaves
 !
 REAL, DIMENSION(:),   INTENT(OUT) :: PFAPAR, PFAPIR, PFAPAR_BS, PFAPIR_BS
 !
+INTEGER,DIMENSION(:), INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
+!
 !*      0.2    declarations of local variables
 !
 !
@@ -144,12 +147,16 @@ WHERE (PLAI(:)==XUNDEF) ZLAI(:) = 0.0
 OSHADE(:)= .TRUE.
 DO JJ = 1, SIZE(PLAI)
 ! CD value calculated for patch with largest fraction ?
-  IDMAX = MAXLOC(PVEGTYPE(JJ,:))   
-  IF(OAGRI_TO_GRASS.AND. (IDMAX(1)==NVT_C3 .OR. IDMAX(1)==NVT_C3W .OR. &
-        IDMAX(1)==NVT_C3S .OR. IDMAX(1)==NVT_C4 .OR. IDMAX(1)==NVT_IRR)) IDMAX(1) = NVT_GRAS
+  IDMAX = MAXLOC(PVEGTYPE(JJ,:))
+  IF ( IDMAX(1) > NVEGTYPE ) IDMAX(1) = NPAR_VEG_IRR_USE( IDMAX(1) - NVEGTYPE )
+  !
+  IF ( OAGRI_TO_GRASS .AND. (IDMAX(1)==NVT_C3 .OR. IDMAX(1)==NVT_C3W .OR. IDMAX(1)==NVT_C3S .OR. &
+                             IDMAX(1)==NVT_C4 .OR. IDMAX(1)==NVT_IRR)) IDMAX(1) = NVT_GRAS
   IDMAX2(1) = IDMAX(1)
+  !
   IF (NVEGTYPE==NVEGTYPE_ECOSG) IDMAX2(1) = ITRANSFERT_ESG(IDMAX(1))
   IF (PLAI(JJ).LT.XLAI_SHADE(IDMAX2(1))) OSHADE(JJ) = .FALSE.
+  !
   ZB_INF(JJ) = XXB_INF(IDMAX2(1))
   ZB_SUP(JJ) = XXB_SUP(IDMAX2(1))
 ENDDO

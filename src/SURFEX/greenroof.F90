@@ -50,6 +50,8 @@
 !                           calculation of vegetation CO2 flux
 !                           dummy for water table / surface coupling
 !!    P. Samuelsson  10/2014  Introduced dummy variables in call to ISBA for MEB
+!!    A. Druel       02/2019  Transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.     DECLARATIONS
@@ -247,8 +249,8 @@ GUPDATED=.FALSE.
 GALB = .FALSE. 
 IF (GRO%CPHOTO=='NIT'.OR.GRO%CPHOTO=='NCB') GALB = .TRUE.
 !
-  CALL VEGETATION_UPDATE(DTCO, DTV, G%NDIM, GRO, K, P, PEK, 1,              &
-                         PTSTEP, S%TTIME, TOP%XCOVER, TOP%LCOVER,  .FALSE., &
+  CALL VEGETATION_UPDATE(DTCO, DTV, G%NDIM, GRO, K, P, PEK, 1, 1, 1,                         &
+                         PTSTEP, S%TTIME, TOP%XCOVER, TOP%LCOVER,  .FALSE., .FALSE., .FALSE.,&
                          'GNR', GALB, YSS, GUPDATED, OABSENT=(T%XGREENROOF==0.)  )
 !
 !*      9.2    Call ISBA for greenroofs
@@ -269,7 +271,7 @@ ALLOCATE(GB%XIACAN(SIZE(PPS),SIZE(S%XABC)))
            PALBNIR_TVEG, PALBVIS_TVEG, PALBNIR_TSOIL, PALBVIS_TSOIL, ZPALPHAN,    &
            ZZ0G_WITHOUT_SNOW, ZZ0_MEBV, ZZ0H_MEBV, ZZ0EFF_MEBV, ZZ0_MEBN,         &
            ZZ0H_MEBN, ZZ0EFF_MEBN, ZTDEEP_A, PCO2, K%XFFG(:), K%XFFV(:),          &
-           ZEMISF, ZUSTAR, PAC_AGG, PHU_AGG, ZRESP_BIOMASS_INST, PDEEP_FLUX, PIRRIG )
+           ZEMISF, ZUSTAR, PAC_AGG, PHU_AGG, ZRESP_BIOMASS_INST, PDEEP_FLUX, PIRRIG, DTV%NPAR_VEG_IRR_USE )
 !
 IF (PEK%TSNOW%SCHEME=='3-L' .OR. PEK%TSNOW%SCHEME=='CRO') PEK%TSNOW%TS(:) = DMK%XSNOWTEMP(:,1)
 !
@@ -282,8 +284,8 @@ IF (PEK%TSNOW%SCHEME=='3-L' .OR. PEK%TSNOW%SCHEME=='CRO') PEK%TSNOW%TS(:) = DMK%
 !
 !
 IF (GRO%CPHOTO=='NIT') THEN
-  CALL VEGETATION_EVOL(GRO, DTV, P, PEK, .FALSE., PTSTEP, TPTIME%TDATE%MONTH, TPTIME%TDATE%DAY,     &
-                       TPTIME%TIME, G%XLAT, PRHOA, PCO2, YSS, ZRESP_BIOMASS_INST )          
+  CALL VEGETATION_EVOL(GRO, DTV, P, PEK, .FALSE., PTSTEP, TPTIME%TDATE%MONTH, TPTIME%TDATE%DAY,     &  ! OAGRIP = FALSE
+                       TPTIME%TIME, G%XLAT, PRHOA, PCO2, YSS, ZRESP_BIOMASS_INST, .FALSE.)             ! LBIOM_REAP        
 END IF
 !
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

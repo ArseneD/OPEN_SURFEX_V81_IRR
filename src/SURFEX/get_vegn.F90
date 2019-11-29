@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #######################################################################
-      SUBROUTINE GET_VEG_n(HPROGRAM, KI, U, IO, S, NP, NPE, PLAI, PVH)
+      SUBROUTINE GET_VEG_n(HPROGRAM, KI, U, IO, S, NP, NPE, NPAR_VEG_IRR_USE, PLAI, PVH)
 !     #######################################################################
 !
 !!****  *GET_VEG_n* - gets some veg fields on atmospheric grid
@@ -29,18 +29,21 @@
 !!    MODIFICATIONS
 !!    -------------
 !!      Original    07/2009
+!!      A. Druel    02/2019 : streamlines the code and adapt it to be compatible with irrigation
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
 !              ------------
 !
-USE MODD_SURF_ATM_n, ONLY : SURF_ATM_t
+USE MODD_SURF_ATM_n,     ONLY : SURF_ATM_t
 USE MODD_ISBA_OPTIONS_n, ONLY : ISBA_OPTIONS_t
-USE MODD_ISBA_n, ONLY : ISBA_S_t, ISBA_P_t, ISBA_PE_t, ISBA_NP_t, ISBA_NPE_t
+USE MODD_ISBA_n,         ONLY : ISBA_S_t, ISBA_P_t, ISBA_PE_t, ISBA_NP_t, ISBA_NPE_t
 !
-USE MODD_SURF_PAR,         ONLY : XUNDEF
+USE MODD_SURF_PAR,       ONLY : XUNDEF
 USE MODD_DATA_COVER_PAR
-
+USE MODD_AGRI,           ONLY : NVEG_IRR
+!
 USE MODI_GET_LUOUT
 USE MODI_VEGTYPE_TO_PATCH
 !                                
@@ -54,11 +57,14 @@ IMPLICIT NONE
 CHARACTER(LEN=6),   INTENT(IN)   :: HPROGRAM    
 INTEGER,            INTENT(IN)   :: KI         ! number of points
 !
-TYPE(SURF_ATM_t), INTENT(INOUT) :: U
+TYPE(SURF_ATM_t),     INTENT(INOUT) :: U
 TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
-TYPE(ISBA_S_t), INTENT(INOUT) :: S
-TYPE(ISBA_NP_t), INTENT(INOUT) :: NP
-TYPE(ISBA_NPE_t), INTENT(INOUT) :: NPE
+TYPE(ISBA_S_t),       INTENT(INOUT) :: S
+TYPE(ISBA_NP_t),      INTENT(INOUT) :: NP
+TYPE(ISBA_NPE_t),     INTENT(INOUT) :: NPE
+!
+INTEGER,DIMENSION(:), INTENT(IN) :: NPAR_VEG_IRR_USE ! vegtype with irrigation
+
 !
 REAL, DIMENSION(KI), INTENT(OUT) :: PVH    ! Tree height 
 REAL, DIMENSION(KI), INTENT(OUT) :: PLAI   
@@ -71,13 +77,15 @@ REAL, DIMENSION(KI), INTENT(OUT) :: PLAI
 !  Arrays defined for each tile
 !  
 !
-TYPE(ISBA_P_t), POINTER :: PK
+TYPE(ISBA_P_t), POINTER  :: PK
 TYPE(ISBA_PE_t), POINTER :: PEK
-INTEGER                               :: JI, JJ           ! loop index over tiles
-INTEGER                               :: ILUOUT       ! unit numberi
+INTEGER                            :: JI, JJ           ! loop index over tiles
+INTEGER                            :: ILUOUT       ! unit numberi
 REAL, DIMENSION(U%NSIZE_NATURE)    :: ZH_TREE, ZLAI, ZWORK
-INTEGER:: IPATCH_TRBE, IPATCH_TRBD, IPATCH_TEBE, IPATCH_TEBD, IPATCH_TENE, &
-          IPATCH_BOBD, IPATCH_BONE, IPATCH_BOND, IMASK, JP
+!INTEGER:: IPATCH_TRBE, IPATCH_TRBD, IPATCH_TEBE, IPATCH_TEBD, IPATCH_TENE, &
+!          IPATCH_BOBD, IPATCH_BONE, IPATCH_BOND, IMASK, JP, JVEG
+INTEGER                            :: IPATCH, IMASK, JP, JVEG, JVEG2
+LOGICAL, DIMENSION(IO%NPATCH)      :: L_IS_TREE
 ! 
 !-------------------------------------------------------------------------------
 !
@@ -89,29 +97,28 @@ CALL GET_LUOUT(HPROGRAM,ILUOUT)
 !
 !*       1. Passage dur le masque global
 !              -------------------------------
-
-IPATCH_TRBE = VEGTYPE_TO_PATCH(NVT_TRBE, IO%NPATCH)
-IPATCH_TRBD = VEGTYPE_TO_PATCH(NVT_TRBD, IO%NPATCH)
-IPATCH_TEBE = VEGTYPE_TO_PATCH(NVT_TEBE, IO%NPATCH)
-IPATCH_TEBD = VEGTYPE_TO_PATCH(NVT_TEBD, IO%NPATCH)
-IPATCH_TENE = VEGTYPE_TO_PATCH(NVT_TENE, IO%NPATCH)
-IPATCH_BOBD = VEGTYPE_TO_PATCH(NVT_BOBD, IO%NPATCH)
-IPATCH_BONE = VEGTYPE_TO_PATCH(NVT_BONE, IO%NPATCH)
-IPATCH_BOND = VEGTYPE_TO_PATCH(NVT_BOND, IO%NPATCH)
-
-
-!ZWORK(:) = S%XVEGTYPE(:,NVT_TRBE) + S%XVEGTYPE(:,NVT_TRBD) + S%XVEGTYPE(:,NVT_TEBE) + &
-!           S%XVEGTYPE(:,NVT_TEBD) + S%XVEGTYPE(:,NVT_TENE) + S%XVEGTYPE(:,NVT_BOBD) + &
-!           S%XVEGTYPE(:,NVT_BONE) + S%XVEGTYPE(:,NVT_BOND)
-
+!
+L_IS_TREE(:) = .FALSE.
+DO JVEG = 1, NVEGTYPE+NVEG_IRR
+  !
+  JVEG2 = JVEG
+  IF ( JVEG > NVEGTYPE ) JVEG2 = NPAR_VEG_IRR_USE( JVEG - NVEGTYPE )
+  !
+  IF ( JVEG2 == NVT_TRBE .OR. JVEG2 == NVT_TRBD .OR. JVEG2 == NVT_TEBE .OR. JVEG2 == NVT_TEBD .OR. &
+       JVEG2 == NVT_TENE .OR. JVEG2 == NVT_BOBD .OR. JVEG2 == NVT_BONE .OR. JVEG2 == NVT_BOND) THEN
+    CALL VEGTYPE_TO_PATCH_IRRIG(JVEG, IO%NPATCH, NPAR_VEG_IRR_USE, IPATCH)
+    L_IS_TREE(IPATCH) = .TRUE.
+  ENDIF
+  !
+ENDDO
+!
 ZH_TREE(:) = 0.
 ZLAI(:) = 0.
 ZWORK(:) = 0.
 !
 DO JP = 1,IO%NPATCH
   !
-  IF (JP==IPATCH_TRBE .OR. JP==IPATCH_TRBD .OR. JP==IPATCH_TEBE .OR. JP==IPATCH_TEBD .OR. &
-      JP==IPATCH_TENE .OR. JP==IPATCH_BOBD .OR. JP==IPATCH_BONE .OR. JP==IPATCH_BOND) THEN
+  IF ( L_IS_TREE(JP) ) THEN
     !
     PK => NP%AL(JP)
     PEK => NPE%AL(JP)

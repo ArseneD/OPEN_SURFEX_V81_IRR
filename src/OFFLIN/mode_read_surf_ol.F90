@@ -33,7 +33,9 @@ MODULE MODE_READ_SURF_OL
 !!    MODIFICATIONS
 !!    -------------
 !!
-!!      original                                                     01/08/03
+!!      original         01/08/03
+!!      A.Druel           02/2019: Change length 40 to 160
+!!
 !----------------------------------------------------------------------------
 !
 INTERFACE READ_SURF0_OL
@@ -777,7 +779,7 @@ IMPLICIT NONE
 !*      0.1   Declarations of arguments
 !
  CHARACTER(LEN=*),   INTENT(IN)  :: HREC     ! name of the article to be read
- CHARACTER(LEN=40),   INTENT(OUT) :: HFIELD   ! the integer scalar to be read
+ CHARACTER(LEN=160), INTENT(OUT) :: HFIELD   ! the integer scalar to be read
 INTEGER,             INTENT(OUT) :: KRESP    ! KRESP  : return-code if a problem appears
  CHARACTER(LEN=100),  INTENT(OUT) :: HCOMMENT ! comment
 !

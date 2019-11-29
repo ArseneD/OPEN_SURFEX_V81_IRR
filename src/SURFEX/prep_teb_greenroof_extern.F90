@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-SUBROUTINE PREP_TEB_GREENROOF_EXTERN (DTCO, IO, U, GCP, &
+SUBROUTINE PREP_TEB_GREENROOF_EXTERN (DTCO, IO, U, GCP, NPAR_VEG_IRR_USE, &
                                       HPROGRAM,HSURF,HFILE,HFILETYPE,HFILEPGD,HFILEPGDTYPE,KLUOUT,KPATCH,PFIELD)
 !     #################################################################################
 !
@@ -26,7 +26,9 @@ SUBROUTINE PREP_TEB_GREENROOF_EXTERN (DTCO, IO, U, GCP, &
 !!
 !!    MODIFICATIONS
 !!    -------------
-!!      Original    07/2011
+!!      Original     07/2011
+!!      A. Druel     02/2019, Adapt the code to be compatible with irrigation and transmit NPAR_VEG_IRR_USE
+!!
 !!------------------------------------------------------------------
 !
 USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
@@ -53,6 +55,7 @@ USE MODD_PREP,               ONLY : CINGRID_TYPE, CINTERP_TYPE
 USE MODD_PREP_TEB_GREENROOF, ONLY : XGRID_SOIL, XWR_DEF
 USE MODD_DATA_COVER_PAR,     ONLY : NVEGTYPE
 USE MODD_SURF_PAR,           ONLY : XUNDEF
+USE MODD_AGRI,               ONLY : NVEG_IRR
 !
 USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 USE PARKIND1  ,ONLY : JPRB
@@ -69,6 +72,7 @@ TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
 TYPE(SURF_ATM_t), INTENT(INOUT) :: U
 TYPE(GRID_CONF_PROJ_t),INTENT(INOUT) :: GCP
 !
+INTEGER,DIMENSION(:),INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
  CHARACTER(LEN=6),   INTENT(IN)  :: HPROGRAM  ! program calling surf. schemes
  CHARACTER(LEN=7),   INTENT(IN)  :: HSURF     ! type of field
  CHARACTER(LEN=28),  INTENT(IN)  :: HFILE     ! name of file
@@ -183,7 +187,7 @@ SELECT CASE(HSURF)
     END IF
     YSURF=ADJUSTL(YSURF)
 !* reading of the profile and its depth definition
-     CALL READ_EXTERN_ISBA(U, DTCO, GCP, IO, HFILE,HFILETYPE,HFILEPGD,HFILEPGDTYPE,KLUOUT,INI,&
+     CALL READ_EXTERN_ISBA(U, DTCO, GCP, IO, NPAR_VEG_IRR_USE,HFILE,HFILETYPE,HFILEPGD,HFILEPGDTYPE,KLUOUT,INI,&
                            HSURF,YSURF,ZFIELD,ZD)
 ! 
      IF (NRANK==NPIO) THEN
@@ -243,8 +247,8 @@ SELECT CASE(HSURF)
      ENDIF     
      CALL CLOSE_AUX_IO_SURF(HFILE,HFILETYPE)
      IF (IPATCH/=1) THEN
-       ALLOCATE(PFIELD(INI,1,NVEGTYPE))
-       CALL PUT_ON_ALL_VEGTYPES(INI,1,IPATCH,NVEGTYPE,ZFIELD,PFIELD)
+       ALLOCATE(PFIELD(INI,1,NVEGTYPE+NVEG_IRR))
+       CALL PUT_ON_ALL_VEGTYPES(INI,1,IPATCH,NVEGTYPE,NPAR_VEG_IRR_USE,ZFIELD,PFIELD)
      ELSE
        ALLOCATE(PFIELD(INI,1,1))
        PFIELD(:,:,:) = ZFIELD(:,:,:)

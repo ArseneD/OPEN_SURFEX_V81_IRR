@@ -3,10 +3,10 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !#############################################################
-SUBROUTINE INIT_VEG_PGD_n (ISSK, DTI, IO, S, K, KK, PK, PEK, AGK, KI, &
-                           HPROGRAM, HSURF, KLUOUT, KSIZE, KMONTH,    &
-                           ODEEPSOIL, OPHYSDOMC, PTDEEP_CLI, PGAMMAT_CLI,     &
-                           OAGRIP, PTHRESHOLD, HINIT, PCO2, PRHOA     )  
+SUBROUTINE INIT_VEG_PGD_n (ISSK, DTI, IO, S, K, KK, PK, PEK, AGK, KI,     &
+                           HPROGRAM, HSURF, KLUOUT, KSIZE, KMONTH,        &
+                           ODEEPSOIL, OPHYSDOMC, PTDEEP_CLI, PGAMMAT_CLI, &
+                           OIRRIGMODE, HINIT, PCO2, PRHOA)  
 !#############################################################
 !
 !!****  *INIT_VEG_PGD_n_n* - routine to initialize ISBA
@@ -35,6 +35,8 @@ SUBROUTINE INIT_VEG_PGD_n (ISSK, DTI, IO, S, K, KK, PK, PEK, AGK, KI, &
 !!    MODIFICATIONS
 !!    -------------
 !!      23/07/13     (Decharme) Surface / Water table depth coupling
+!!      02/2019      (A. Druel) Adapt the code to be compatible with irrigation (and new patches)
+!!                              Remove old parameters (not use anymore: XTHRESHOLDSPT, PTHRESHOLD & LIRRIDAY)
 !!
 !-------------------------------------------------------------------------------
 !
@@ -85,39 +87,38 @@ IMPLICIT NONE
 !              --²-----------------------
 !
 !
-TYPE(SSO_t), INTENT(INOUT) :: ISSK
-TYPE(DATA_ISBA_t), INTENT(INOUT) :: DTI
+TYPE(SSO_t), INTENT(INOUT)          :: ISSK
+TYPE(DATA_ISBA_t), INTENT(INOUT)    :: DTI
 !
 TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
-TYPE(ISBA_S_t), INTENT(INOUT) :: S
-TYPE(ISBA_K_t), INTENT(INOUT) :: K
-TYPE(ISBA_K_t), INTENT(INOUT) :: KK
-TYPE(ISBA_P_t), INTENT(INOUT) :: PK
-TYPE(ISBA_PE_t), INTENT(INOUT) :: PEK
-TYPE(AGRI_t), INTENT(INOUT) :: AGK
+TYPE(ISBA_S_t), INTENT(INOUT)       :: S
+TYPE(ISBA_K_t), INTENT(INOUT)       :: K
+TYPE(ISBA_K_t), INTENT(INOUT)       :: KK
+TYPE(ISBA_P_t), INTENT(INOUT)       :: PK
+TYPE(ISBA_PE_t), INTENT(INOUT)      :: PEK
+TYPE(AGRI_t), INTENT(INOUT)         :: AGK
 !
-INTEGER, INTENT(IN) :: KI
+INTEGER, INTENT(IN)                 :: KI
 !
- CHARACTER(LEN=6), INTENT(IN)  :: HPROGRAM  ! program calling surf. schemes
- CHARACTER(LEN=6), INTENT(IN)  :: HSURF     ! Type of surface
-INTEGER, INTENT(IN)  :: KLUOUT
+ CHARACTER(LEN=6), INTENT(IN)       :: HPROGRAM  ! program calling surf. schemes
+ CHARACTER(LEN=6), INTENT(IN)       :: HSURF     ! Type of surface
+INTEGER, INTENT(IN)                 :: KLUOUT
 !
-INTEGER, INTENT(IN)  :: KSIZE
+INTEGER, INTENT(IN)                 :: KSIZE
 !
-INTEGER, INTENT(IN)  :: KMONTH
+INTEGER, INTENT(IN)                 :: KMONTH
 !
-LOGICAL, INTENT(IN) :: ODEEPSOIL
-LOGICAL, INTENT(IN) :: OPHYSDOMC
-REAL, DIMENSION(:), INTENT(IN) :: PTDEEP_CLI
-REAL, DIMENSION(:), INTENT(IN) :: PGAMMAT_CLI
+LOGICAL, INTENT(IN)                 :: ODEEPSOIL
+LOGICAL, INTENT(IN)                 :: OPHYSDOMC
+REAL, DIMENSION(:), INTENT(IN)      :: PTDEEP_CLI
+REAL, DIMENSION(:), INTENT(IN)      :: PGAMMAT_CLI
 !
-LOGICAL, INTENT(IN) :: OAGRIP
-REAL, DIMENSION(:), INTENT(IN) :: PTHRESHOLD
+LOGICAL, INTENT(IN)                 :: OIRRIGMODE
 !
- CHARACTER(LEN=3), INTENT(IN) :: HINIT
+ CHARACTER(LEN=3), INTENT(IN)       :: HINIT
  !
-REAL, DIMENSION(:), INTENT(IN) :: PCO2
-REAL, DIMENSION(:), INTENT(IN) :: PRHOA
+REAL, DIMENSION(:), INTENT(IN)      :: PCO2
+REAL, DIMENSION(:), INTENT(IN)      :: PRHOA
 !
 !*       0.2   Declarations of local variables
 !              -------------------------------
@@ -126,7 +127,7 @@ REAL, DIMENSION(KI,IO%NGROUND_LAYER) :: ZCONDSAT
 !
 INTEGER :: JPATCH  ! loop counter on tiles
 INTEGER :: JILU,JP, JMAXLOC    ! loop increment
-INTEGER :: JL, JI  ! loop counter on layers
+INTEGER :: JL  ! loop counter on layers
 !
 INTEGER :: IABC
 !
@@ -227,7 +228,6 @@ IF (.NOT.ASSOCIATED(K%XMPOTSAT)) THEN
         ENDDO
       ENDIF
       K%XWD0(:,:) = K%XWSAT(:,:) * ((0.0001/XDAY)/ZCONDSAT(:,:))**(1./(2.*K%XBCOEF(:,:)+3.))
-      print*,'wd0 ',minval(K%XWD0),maxval(K%XWD0)
     ELSEIF(IO%CISBA=='DIF')THEN
       K%XWD0(:,:) = WFC_FUNC(K%XCLAY(:,:),K%XSAND(:,:),IO%CPEDOTF)
     ELSE
@@ -346,25 +346,20 @@ ALLOCATE(KK%XALBUV_WET   (KSIZE))
 !*       2.A.4. Irrigation
 !        -----------------
 !
-IF (OAGRIP) THEN
+IF (OIRRIGMODE) THEN
   !
   ALLOCATE(AGK%NIRRINUM     (KSIZE))
-  ALLOCATE(AGK%LIRRIDAY     (KSIZE))
   ALLOCATE(AGK%LIRRIGATE    (KSIZE))
-  ALLOCATE(AGK%XTHRESHOLDSPT(KSIZE))
+  ALLOCATE(AGK%NIRR_TSC     (KSIZE))
   !
   AGK%NIRRINUM (:) = 1
-  AGK%LIRRIDAY (:) = .FALSE.                          
-  AGK%LIRRIGATE(:) = .FALSE.                          
+  AGK%LIRRIGATE(:) = .FALSE.
+  AGK%NIRR_TSC(:)  = 0
   !
-  DO JILU = 1, KSIZE
-    AGK%XTHRESHOLDSPT(JILU) = PTHRESHOLD(AGK%NIRRINUM(JILU))
-  END DO
 ELSE
   ALLOCATE(AGK%NIRRINUM     (0))
-  ALLOCATE(AGK%LIRRIDAY     (0))
   ALLOCATE(AGK%LIRRIGATE    (0))
-  ALLOCATE(AGK%XTHRESHOLDSPT(0))
+  ALLOCATE(AGK%NIRR_TSC     (0))
 ENDIF
 !
 !*       2.A.5. Orographic roughness length
@@ -424,7 +419,7 @@ IF(IO%CPHOTO /= 'NON' .AND. HINIT == 'ALL') THEN
   ALLOCATE(PK%XTAU_WOOD     (KSIZE))
   ALLOCATE(PK%XINCREASE     (KSIZE,IO%NNBIOMASS))
   ALLOCATE(PK%XTURNOVER     (KSIZE,IO%NNBIOMASS))
-  CALL CO2_INIT_n(IO, S, PK, PEK, KSIZE, ZCO2  )
+  CALL CO2_INIT_n(IO, S, PK, PEK, KSIZE, ZCO2, DTI%NPAR_VEG_IRR_USE)
   !
 ELSEIF(IO%CPHOTO == 'NON' .AND. IO%LTR_ML) THEN ! Case for MEB
    !

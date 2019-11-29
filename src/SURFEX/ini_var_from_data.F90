@@ -185,43 +185,42 @@ OPRESENT(:) = .FALSE.
 YNAME=ADJUSTL(HNAME)
 !
 IF (HFTYP(1)=='DIRTYP') THEN
-
+  !
   CALL INI_VAR_FROM_DATA_0D(DTCO, UG, U, USS, &
                             HPROGRAM, HATYPE, HNAME, HTYPE, HFNAM(1), &
                             HFTYP(1), PUNIF(1), PFIELD, OPRESENT(1), PPAR_VEGTYPE)
-
+  !
   OPRESENT(2:) = OPRESENT(1)
-
-
+  !
 ELSE
-
-        
-  IF (.NOT.ALL(LEN_TRIM(HFNAM(:))/=0) .AND. COUNT(LEN_TRIM(HFNAM(:))/=0)>1) THEN
-    DO JV=1,SIZE(PFIELD,2)
-      IF (LEN_TRIM(HFNAM(JV))==0) THEN
-        DO JV2=JV-1,1,-1
-          IF (LEN_TRIM(HFNAM(JV2))/=0) THEN
-            HFNAM(JV) = HFNAM(JV2)
-            HFTYP(JV) = HFTYP(JV2)
-          ENDIF
-        ENDDO
-      ENDIF
-    ENDDO
-  ENDIF
-
+  !
+  ! Remove because use to complete no data information... why ?? ==> problem with irrigation
+!  IF (.NOT.ALL(LEN_TRIM(HFNAM(:))/=0) .AND. .NOT.ALL(LEN_TRIM(HFNAM(2:))==0)) THEN
+!    DO JV=1,SIZE(PFIELD,2)
+!      IF (LEN_TRIM(HFNAM(JV))==0) THEN
+!        DO JV2=JV-1,1,-1
+!          IF (LEN_TRIM(HFNAM(JV2))/=0) THEN
+!            HFNAM(JV) = HFNAM(JV2)
+!            HFTYP(JV) = HFTYP(JV2)
+!          ENDIF
+!        ENDDO
+!      ENDIF
+!    ENDDO
+!  ENDIF
   DO JV=1,SIZE(PFIELD,2)
-
+    !
     IF (ALL(LEN_TRIM(HFNAM(2:))==0)) THEN
       ZMASK(:) = 1.
     ELSE
       ZMASK(:) = PPAR_VEGTYPE(:,JV)
     ENDIF
-
+    !
     CALL INI_VAR_FROM_DATA_0D(DTCO, UG, U, USS, &
                             HPROGRAM, HATYPE, HNAME, HTYPE, HFNAM(JV), &
                 HFTYP(JV), PUNIF(JV), PFIELD(:,JV), OPRESENT(JV), ZMASK)
+    !
   ENDDO
-
+  !
 ENDIF
 !
 IF (LHOOK) &
@@ -422,7 +421,7 @@ ISIZE_V = SIZE(PFIELD_TIME,3)
 DO JTIME=1,SIZE(PFIELD_TIME,2)
 !
   IF (HFTYP(1,JTIME)=='DIRTYP') THEN
-
+    !
     IF (SIZE(OPRESENT)>ISIZE_V) THEN
       IDX = (JTIME-1)*ISIZE_V+1
     ELSE
@@ -433,35 +432,36 @@ DO JTIME=1,SIZE(PFIELD_TIME,2)
                               HFTYP(1,JTIME), PUNIF(1,JTIME), PFIELD_TIME(:,JTIME,:), &
                               OPRESENT(IDX), PPAR_VEGTYPE)
     OPRESENT(IDX+1:IDX+ISIZE_V-1) = OPRESENT(IDX)
-
+    !
   ELSE
-
-    IF (.NOT.ALL(LEN_TRIM(HFNAM(:,JTIME))/=0) .AND. &
-           COUNT(LEN_TRIM(HFNAM(:,JTIME))/=0)>1) THEN
-      DO JV=1,SIZE(PFIELD_TIME,3)
-        IF (LEN_TRIM(HFNAM(JV,JTIME))==0) THEN
-          DO JV2=JV-1,1,-1
-            IF (LEN_TRIM(HFNAM(JV2,JTIME))/=0) THEN
-              HFNAM(JV,JTIME) = HFNAM(JV2,JTIME)
-              HFTYP(JV,JTIME) = HFTYP(JV2,JTIME)
-            ENDIF
-          ENDDO
-        ENDIF
-      ENDDO
-    ENDIF
-
-    IF (.NOT.ALL(PUNIF(:,JTIME)/=XUNDEF) .AND. &
-           COUNT(PUNIF(:,JTIME)/=XUNDEF)>1) THEN
-      DO JV=1,SIZE(PFIELD_TIME,3)
-        IF (PUNIF(JV,JTIME)==XUNDEF) THEN
-          DO JV2=JV-1,1,-1
-            IF (PUNIF(JV2,JTIME)/=XUNDEF) THEN
-              PUNIF(JV,JTIME) = PUNIF(JV2,JTIME)
-            ENDIF
-          ENDDO
-        ENDIF
-      ENDDO
-    ENDIF
+    !
+    ! Remove because use to complete no data information... why ?? ==> problem with irrigation
+!    IF (.NOT.ALL(LEN_TRIM(HFNAM(:,JTIME))/=0) .AND. &
+!           COUNT(LEN_TRIM(HFNAM(:,JTIME))/=0)>1) THEN
+!      DO JV=1,SIZE(PFIELD_TIME,3)
+!        IF (LEN_TRIM(HFNAM(JV,JTIME))==0) THEN
+!          DO JV2=JV-1,1,-1
+!            IF (LEN_TRIM(HFNAM(JV2,JTIME))/=0) THEN
+!              HFNAM(JV,JTIME) = HFNAM(JV2,JTIME)
+!              HFTYP(JV,JTIME) = HFTYP(JV2,JTIME)
+!            ENDIF
+!          ENDDO
+!        ENDIF
+!      ENDDO
+!    ENDIF
+!
+!    IF (.NOT.ALL(PUNIF(:,JTIME)/=XUNDEF) .AND. &
+!           COUNT(PUNIF(:,JTIME)/=XUNDEF)>1) THEN
+!      DO JV=1,SIZE(PFIELD_TIME,3)
+!        IF (PUNIF(JV,JTIME)==XUNDEF) THEN
+!          DO JV2=JV-1,1,-1
+!            IF (PUNIF(JV2,JTIME)/=XUNDEF) THEN
+!              PUNIF(JV,JTIME) = PUNIF(JV2,JTIME)
+!            ENDIF
+!          ENDDO
+!        ENDIF
+!      ENDDO
+!    ENDIF
 
     DO JV=1,ISIZE_V
 
@@ -487,7 +487,6 @@ DO JTIME=1,SIZE(PFIELD_TIME,2)
 
 ENDDO
 !
-!print*,HNAME
 IF (SIZE(OPRESENT)>ISIZE_V) THEN
   DO JV = 1,ISIZE_V
     DO JTIME=1,SIZE(PFIELD_TIME,2)-1

@@ -11,6 +11,8 @@ MODULE MODI_WRITE_SURF
 !!    -------------
 !!      Original       
 !!      J.Escobar      10/06/2013: replace DOUBLE PRECISION by REAL to handle problem for promotion of real on IBM SP
+!!      A.Druel           02/2019: Change and adapth len 40 to 160
+!!
 !----------------------------------------------------
 !
   INTERFACE WRITE_SURF
@@ -1219,7 +1221,7 @@ INTEGER,             INTENT(OUT) :: KRESP    ! KRESP  : return-code if a problem
 !
  CHARACTER(LEN=12) :: YREC
  CHARACTER(LEN=16) :: YREC2
- CHARACTER(LEN=40) :: YFIELD
+ CHARACTER(LEN=160) :: YFIELD
 LOGICAL :: GNOWRITE
 REAL   :: XTIME0
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
@@ -1227,7 +1229,8 @@ REAL(KIND=JPRB) :: ZHOOK_HANDLE
 IF (LHOOK) CALL DR_HOOK('MODI_WRITE_SURF:WRITE_SURFC0',0,ZHOOK_HANDLE)
 !
 YREC = HREC
-YFIELD = "                                        "
+YFIELD = "                                                                                                    "&
+       //"                                                            "
 YFIELD(1:LEN(HFIELD)) = HFIELD
 !
  CALL TEST_RECORD_LEN(HPROGRAM,YREC,HSELECT,GNOWRITE)

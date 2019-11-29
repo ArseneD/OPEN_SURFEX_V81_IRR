@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-      SUBROUTINE DEFAULT_AGRI(OAGRIP)
+      SUBROUTINE DEFAULT_AGRI(OAGRIP, OIRRIGMODE)
 !     ########################################################################
 !
 !!****  *DEFAULT_ISBA* - routine to set default values for 
@@ -34,6 +34,7 @@
 !!    -------------
 !!      Original    10/2005
 !!      Modified by P. Le Moigne (06/2006): seeding and irrigation
+!!      Modified by A. Druel     (02/2019): Add the OIRRIGMODE flag
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
@@ -45,6 +46,7 @@ USE PARKIND1  ,ONLY : JPRB
 !
 IMPLICIT NONE
 LOGICAL, INTENT(OUT) :: OAGRIP
+LOGICAL, INTENT(OUT) :: OIRRIGMODE
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
 !*       0.1   Declarations of arguments
@@ -53,7 +55,8 @@ REAL(KIND=JPRB) :: ZHOOK_HANDLE
 ! General switch
 !
 IF (LHOOK) CALL DR_HOOK('DEFAULT_AGRI',0,ZHOOK_HANDLE)
-OAGRIP = .FALSE.
+OAGRIP     = .FALSE.
+OIRRIGMODE = .FALSE.
 IF (LHOOK) CALL DR_HOOK('DEFAULT_AGRI',1,ZHOOK_HANDLE)
 !
 END SUBROUTINE DEFAULT_AGRI

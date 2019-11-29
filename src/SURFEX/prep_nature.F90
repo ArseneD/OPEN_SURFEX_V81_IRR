@@ -25,8 +25,10 @@ SUBROUTINE PREP_NATURE (DTCO, IM, UG, U, USS, GCP, &
 !!
 !!    MODIFICATIONS
 !!    -------------
-!!      Original    01/2004
+!!      Original     01/2004
 !!      P. Marguinaud10/2014, Support for a 2-part PREP
+!!      A. Druel     02/2019 - transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !!------------------------------------------------------------------
 !
 USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
@@ -71,6 +73,7 @@ REAL(KIND=JPRB) :: ZHOOK_HANDLE
 IF (LHOOK) CALL DR_HOOK('PREP_NATURE',0,ZHOOK_HANDLE)
 IF (U%CNATURE=='ISBA  ' .OR. U%CNATURE=='TSZ0  ' ) THEN
   CALL PREP_ISBA(DTCO, UG, U, USS, GCP, IM%SB, IM%G, IM%O, IM%S, IM%NK, IM%NP, IM%NPE, &
+                 IM%DTV%NPAR_VEG_IRR_USE,                                              &
                  HPROGRAM,HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,YDCTL)
 END IF
 IF (LHOOK) CALL DR_HOOK('PREP_NATURE',1,ZHOOK_HANDLE)

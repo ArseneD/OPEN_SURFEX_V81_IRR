@@ -17,11 +17,11 @@ TYPE(DATA_COVER_t), INTENT(INOUT) :: DTCO
 REAL, DIMENSION(:),     INTENT(OUT) :: PFIELD  ! secondary field to construct
 REAL, DIMENSION(:,:),   INTENT(IN)  :: PCOVER  ! fraction of each cover class
 REAL, DIMENSION(:),     INTENT(IN)  :: PDATA   ! secondary field value for each class
- CHARACTER(LEN=3),       INTENT(IN)  :: HSFTYPE ! Type of surface where the field
+ CHARACTER(LEN=3),       INTENT(IN) :: HSFTYPE ! Type of surface where the field
                                                ! is defined
- CHARACTER(LEN=3),       INTENT(IN)  :: HATYPE  ! Type of averaging
-LOGICAL, DIMENSION(:),  INTENT(IN) :: OCOVER
-INTEGER, DIMENSION(:), INTENT(IN) :: KMASK
+ CHARACTER(LEN=3),       INTENT(IN) :: HATYPE  ! Type of averaging
+LOGICAL, DIMENSION(:),  INTENT(IN)  :: OCOVER
+INTEGER, DIMENSION(:), INTENT(IN)   :: KMASK
 INTEGER, INTENT(IN) :: KNPATCH
 INTEGER, INTENT(IN) :: KPATCH
 REAL, DIMENSION(:),     INTENT(IN), OPTIONAL :: PDZ    ! first model half level
@@ -30,7 +30,7 @@ INTEGER,                INTENT(IN), OPTIONAL :: KDECADE ! current month
 END SUBROUTINE AV_PGD_1D_1P
 !     ################################################################
       SUBROUTINE AV_PATCH_PGD_1D_1P (DTCO, &
-                                  PFIELD,PCOVER,PDATA,HSFTYPE,HATYPE,OCOVER,KMASK,KNPATCH,KPATCH,PDZ,KDECADE)
+                                 PFIELD,PCOVER,PDATA,PIRRIG,NPAR_VEG_IRR_USE,HSFTYPE,HATYPE,OCOVER,KMASK,KNPATCH,KPATCH,PDZ,KDECADE)
 !     ################################################################
 !
 !
@@ -42,13 +42,15 @@ USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
 !
 TYPE(DATA_COVER_t), INTENT(INOUT) :: DTCO
 !
-REAL, DIMENSION(:), INTENT(OUT) :: PFIELD  ! secondary field to construct
+REAL, DIMENSION(:), INTENT(OUT)   :: PFIELD  ! secondary field to construct
 REAL, DIMENSION(:,:), INTENT(IN)  :: PCOVER  ! fraction of each cover class
 REAL, DIMENSION(:,:), INTENT(IN)  :: PDATA   ! secondary field value for each class
- CHARACTER(LEN=3),     INTENT(IN)  :: HSFTYPE ! Type of surface where the field
+REAL, DIMENSION(:,:), INTENT(IN)  :: PIRRIG  ! fraction of irrigation for each vegtype
+INTEGER,DIMENSION(:), INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
+ CHARACTER(LEN=3),     INTENT(IN) :: HSFTYPE ! Type of surface where the field
                                                ! is defined
- CHARACTER(LEN=3),     INTENT(IN)  :: HATYPE  ! Type of averaging
-LOGICAL, DIMENSION(:), INTENT(IN)  :: OCOVER
+ CHARACTER(LEN=3),     INTENT(IN) :: HATYPE  ! Type of averaging
+LOGICAL, DIMENSION(:), INTENT(IN) :: OCOVER
 INTEGER, DIMENSION(:), INTENT(IN) :: KMASK
 INTEGER, INTENT(IN) :: KNPATCH
 INTEGER, INTENT(IN) :: KPATCH
@@ -58,7 +60,7 @@ INTEGER,              INTENT(IN), OPTIONAL :: KDECADE ! current month
 END SUBROUTINE AV_PATCH_PGD_1D_1P
 !
 !     ################################################################
-      SUBROUTINE MAJOR_PATCH_PGD_1D_1P(TFIELD,PCOVER,TDATA,HSFTYPE,HATYPE,&
+      SUBROUTINE MAJOR_PATCH_PGD_1D_1P(TFIELD,PCOVER,TDATA,PIRRIG,NPAR_VEG_IRR_USE,HSFTYPE,HATYPE,&
                       OCOVER,KMASK,KNPATCH,KPATCH,KDECADE)
 !     ################################################################
 !
@@ -72,12 +74,14 @@ IMPLICIT NONE
 !*    0.1    Declaration of arguments
 !            ------------------------
 !
-TYPE (DATE_TIME), DIMENSION(:), INTENT(OUT) :: TFIELD  ! secondary field to construct
-REAL, DIMENSION(:,:), INTENT(IN)  :: PCOVER  ! fraction of each cover class
-TYPE (DATE_TIME), DIMENSION(:,:), INTENT(IN)  :: TDATA   ! secondary field value for each class
- CHARACTER(LEN=3),     INTENT(IN)  :: HSFTYPE ! Type of surface where the field
+TYPE (DATE_TIME), DIMENSION(:), INTENT(OUT)  :: TFIELD  ! secondary field to construct
+REAL, DIMENSION(:,:), INTENT(IN)             :: PCOVER  ! fraction of each cover class
+TYPE (DATE_TIME), DIMENSION(:,:), INTENT(IN) :: TDATA   ! secondary field value for each class
+REAL, DIMENSION(:,:), INTENT(IN)  :: PIRRIG  ! fraction of irrigation for each vegtype
+INTEGER,DIMENSION(:), INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
+ CHARACTER(LEN=3),     INTENT(IN) :: HSFTYPE ! Type of surface where the field
                                                ! is defined
- CHARACTER(LEN=3),     INTENT(IN)  :: HATYPE  ! Type of averaging
+ CHARACTER(LEN=3),     INTENT(IN) :: HATYPE  ! Type of averaging
 LOGICAL, DIMENSION(:), INTENT(IN) :: OCOVER
 INTEGER, DIMENSION(:), INTENT(IN) :: KMASK
 INTEGER, INTENT(IN) :: KNPATCH
@@ -138,6 +142,7 @@ END MODULE MODI_AV_PGD_1P
 !!    Original    15/12/97
 !!    V. Masson   01/2004  Externalization
 !!    R. Alkama   05/2012  Add 6 tree vegtypes (9 rather than 3)
+!!    A. Druel    02/2019  Compatibility with new irrigation (duplication of patches) and add MA1 and ARV possibility (without taking into account the zeros)
 !!
 !----------------------------------------------------------------------------
 !
@@ -146,7 +151,7 @@ END MODULE MODI_AV_PGD_1P
 !
 USE MODD_DATA_COVER_PAR, ONLY : XCDREF
 !
-USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
+USE MODD_DATA_COVER_n, ONLY   : DATA_COVER_t
 !
 USE MODD_SURF_PAR,       ONLY : XUNDEF
 !
@@ -163,16 +168,16 @@ IMPLICIT NONE
 !            ------------------------
 !
 !
-TYPE(DATA_COVER_t), INTENT(INOUT) :: DTCO
+TYPE(DATA_COVER_t), INTENT(INOUT)   :: DTCO
 !
 REAL, DIMENSION(:),     INTENT(OUT) :: PFIELD  ! secondary field to construct
 REAL, DIMENSION(:,:),   INTENT(IN)  :: PCOVER  ! fraction of each cover class
 REAL, DIMENSION(:),     INTENT(IN)  :: PDATA   ! secondary field value for each class
- CHARACTER(LEN=3),       INTENT(IN)  :: HSFTYPE ! Type of surface where the field
+ CHARACTER(LEN=3),       INTENT(IN) :: HSFTYPE ! Type of surface where the field
                                                ! is defined
- CHARACTER(LEN=3),       INTENT(IN)  :: HATYPE  ! Type of averaging
-LOGICAL, DIMENSION(:),  INTENT(IN) :: OCOVER
-INTEGER, DIMENSION(:), INTENT(IN) :: KMASK
+ CHARACTER(LEN=3),       INTENT(IN) :: HATYPE  ! Type of averaging
+LOGICAL, DIMENSION(:),  INTENT(IN)  :: OCOVER
+INTEGER, DIMENSION(:), INTENT(IN)   :: KMASK
 INTEGER, INTENT(IN) :: KNPATCH
 INTEGER, INTENT(IN) :: KPATCH
 REAL, DIMENSION(:),     INTENT(IN), OPTIONAL :: PDZ    ! first model half level
@@ -186,11 +191,11 @@ INTEGER :: ICOVER  ! number of cover classes
 INTEGER :: JCOVER  ! loop on cover classes
 !
 INTEGER, DIMENSION(SIZE(PCOVER,2)) :: IMASK
-REAL, DIMENSION(SIZE(PFIELD)) :: ZWORK, ZDZ, ZVAL
-REAL, DIMENSION(SIZE(PCOVER,2)) :: ZWEIGHT
-REAL :: ZCOVER_WEIGHT
-REAL, DIMENSION(SIZE(PFIELD)) :: ZSUM_COVER_WEIGHT
-REAL(KIND=JPRB) :: ZHOOK_HANDLE, ZHOOK_HANDLE_OMP
+REAL, DIMENSION(SIZE(PFIELD))      :: ZWORK, ZDZ, ZVAL
+REAL, DIMENSION(SIZE(PCOVER,2))    :: ZWEIGHT, ZWEIGHT_TMP
+REAL                               :: ZCOVER_WEIGHT
+REAL, DIMENSION(SIZE(PFIELD))      :: ZSUM_COVER_WEIGHT
+REAL(KIND=JPRB)                    :: ZHOOK_HANDLE, ZHOOK_HANDLE_OMP
 !-------------------------------------------------------------------------------
 !
 !*    1.1    field does not exist
@@ -237,14 +242,14 @@ ENDDO
 !*    3.1    Work arrays
 !            -----------
 !
-IF (HATYPE=='ARI' .OR. HATYPE=='INV' .OR. HATYPE=='CDN') THEN
+IF (HATYPE=='ARI' .OR. HATYPE=='ARV' .OR. HATYPE=='INV' .OR. HATYPE=='CDN') THEN
   !
   DO JCOVER=1,ICOVER
     IF (ZWEIGHT(JCOVER)/=0.) THEN
       !
       JJ = IMASK(JCOVER)
       !
-      IF (HATYPE=='ARI') THEN
+      IF (HATYPE=='ARI' .OR. HATYPE=='ARV') THEN
         ZVAL(:) = PDATA(JJ)
       ELSEIF (HATYPE=='INV') THEN
         ZVAL(:) = 1./PDATA(JJ)
@@ -266,15 +271,20 @@ IF (HATYPE=='ARI' .OR. HATYPE=='INV' .OR. HATYPE=='CDN') THEN
       !
     ENDIF
   ENDDO
-ELSEIF (HATYPE=='MAJ') THEN
+ELSEIF (HATYPE=='MAJ' .OR. HATYPE=='MA1') THEN
   !
   DO JI = 1,SIZE(KMASK)
     !
     IMASK0 = KMASK(JI)
     !
-    ID0 = MAXVAL(MAXLOC(PCOVER(IMASK0,:)*ZWEIGHT(:)))
+    ID0 = MAXLOC(PCOVER(IMASK0,:)*ZWEIGHT(:),1)
+    IF ( HATYPE=='MA1' .AND. PDATA(IMASK(ID0))==0. ) THEN ! tested ?
+      ZWEIGHT_TMP(:)=ZWEIGHT(:)
+      ZWEIGHT_TMP(ID0)=0.
+      ID0 = MAXLOC(PCOVER(IMASK0,:)*ZWEIGHT_TMP(:),1)
+    ENDIF
     ZWORK(JI) = PDATA(IMASK(ID0))
-    ZSUM_COVER_WEIGHT(JI) = ZSUM_COVER_WEIGHT(JI) + SUM(PCOVER(IMASK0,:)*ZWEIGHT(:))
+    ZSUM_COVER_WEIGHT(JI) = 1.
     !
   ENDDO
   !
@@ -298,7 +308,7 @@ IF (LHOOK) CALL DR_HOOK('MODI_AV_PGD_1P:AV_PGD_1D_1P',0,ZHOOK_HANDLE)
 !*    4.2    Arithmetic averaging
 !            --------------------
 !
-  CASE ('ARI')
+  CASE ('ARI', 'ARV')
 !
     WHERE ( ZSUM_COVER_WEIGHT(:) >0. )
       PFIELD(:) = ZWORK(:) / ZSUM_COVER_WEIGHT(:)
@@ -332,7 +342,7 @@ IF (LHOOK) CALL DR_HOOK('MODI_AV_PGD_1P:AV_PGD_1D_1P',0,ZHOOK_HANDLE)
 !*    4.4    Majoritary averaging
 !            --------------------
 !
-  CASE('MAJ' )
+  CASE('MAJ','MA1')
 !
     WHERE ( ZSUM_COVER_WEIGHT(:) >0. )
       PFIELD(:) = ZWORK(:)
@@ -352,7 +362,7 @@ IF (LHOOK) CALL DR_HOOK('MODI_AV_PGD_1P:AV_PGD_1D_1P_4',1,ZHOOK_HANDLE)
 END SUBROUTINE AV_PGD_1D_1P
 !
 !     ################################################################
-      SUBROUTINE AV_PATCH_PGD_1D_1P (DTCO, PFIELD,PCOVER,PDATA,HSFTYPE,HATYPE,OCOVER,KMASK,&
+      SUBROUTINE AV_PATCH_PGD_1D_1P (DTCO, PFIELD,PCOVER,PDATA,PIRRIG,NPAR_VEG_IRR_USE,HSFTYPE,HATYPE,OCOVER,KMASK,&
                                      KNPATCH,KPATCH,PDZ,KDECADE)
 !     ################################################################
 !
@@ -400,6 +410,7 @@ END SUBROUTINE AV_PGD_1D_1P
 !!    Original    15/12/97
 !!    V. Masson   01/2004  Externalization
 !!    R. Alkama   05/2012  Add 6 tree vegtypes (9 rather than 3)
+!!    A. Druel    02/2019  Compatibility with new irrigation (duplication of patches) and add MA1 and ARV possibility (without taking into account the zeros)
 !!
 !----------------------------------------------------------------------------
 !
@@ -407,14 +418,15 @@ END SUBROUTINE AV_PGD_1D_1P
 !            -----------
 !
 !
-USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
+USE MODD_DATA_COVER_n,   ONLY : DATA_COVER_t
 !
 USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE, XCDREF
 USE MODD_SURF_PAR,       ONLY : XUNDEF
+USE MODD_AGRI,           ONLY : NVEG_IRR
 !
 USE MODE_AV_PGD
 !
-USE MODI_VEGTYPE_TO_PATCH 
+USE MODI_VEGTYPE_TO_PATCH_IRRIG 
 !
 USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 USE PARKIND1  ,ONLY : JPRB
@@ -429,13 +441,15 @@ IMPLICIT NONE
 !
 TYPE(DATA_COVER_t), INTENT(INOUT) :: DTCO
 !
-REAL, DIMENSION(:), INTENT(OUT) :: PFIELD  ! secondary field to construct
+REAL, DIMENSION(:), INTENT(OUT)   :: PFIELD  ! secondary field to construct
 REAL, DIMENSION(:,:), INTENT(IN)  :: PCOVER  ! fraction of each cover class
 REAL, DIMENSION(:,:), INTENT(IN)  :: PDATA   ! secondary field value for each class
- CHARACTER(LEN=3),     INTENT(IN)  :: HSFTYPE ! Type of surface where the field
+REAL, DIMENSION(:,:), INTENT(IN)  :: PIRRIG  ! fraction of irrigation for each vegtype
+INTEGER,DIMENSION(:), INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
+ CHARACTER(LEN=3),     INTENT(IN) :: HSFTYPE ! Type of surface where the field
                                                ! is defined
- CHARACTER(LEN=3),     INTENT(IN)  :: HATYPE  ! Type of averaging
-LOGICAL, DIMENSION(:), INTENT(IN)  :: OCOVER
+ CHARACTER(LEN=3),     INTENT(IN) :: HATYPE  ! Type of averaging
+LOGICAL, DIMENSION(:), INTENT(IN) :: OCOVER
 INTEGER, DIMENSION(:), INTENT(IN) :: KMASK
 INTEGER, INTENT(IN) :: KNPATCH
 INTEGER, INTENT(IN) :: KPATCH
@@ -453,21 +467,23 @@ INTEGER :: JCOVER  ! loop on cover classes
 INTEGER :: JVEG! loop on vegtype
 INTEGER :: JJ, JI, JK
 !
-REAL         :: ZCOVER_WEIGHT
+REAL    :: ZCOVER_WEIGHT
 !
-REAL, DIMENSION(SIZE(PFIELD)) :: ZVAL
+REAL, DIMENSION(SIZE(PFIELD))   :: ZVAL
 !
-REAL, DIMENSION(SIZE(PCOVER,2),NVEGTYPE)         :: ZWEIGHT
+REAL, DIMENSION(SIZE(PCOVER,2),NVEGTYPE) :: ZWEIGHT
 !
 REAL, DIMENSION(SIZE(PFIELD))   :: ZSUM_COVER_WEIGHT_PATCH
 !
 REAL, DIMENSION(SIZE(PFIELD))   :: ZWORK
 REAL, DIMENSION(SIZE(PFIELD))   :: ZDZ
+REAL, DIMENSION(SIZE(PIRRIG,1)) :: ZXIRRIG
 !
-INTEGER  :: IMASK, JP
-INTEGER, DIMENSION(SIZE(PCOVER,2))  :: IMASK0
-INTEGER ::  PATCH_LIST(NVEGTYPE)
-REAL(KIND=JPRB) :: ZHOOK_HANDLE, ZHOOK_HANDLE_OMP
+REAL                               :: ZMAX0, ZMAX1, ZXIRRIG2
+INTEGER                            :: IMASK, JP, ID0, JVEG0, ID
+INTEGER, DIMENSION(SIZE(PCOVER,2)) :: IMASK0
+INTEGER                            ::  PATCH_LIST(NVEGTYPE+NVEG_IRR)
+REAL(KIND=JPRB)                    :: ZHOOK_HANDLE, ZHOOK_HANDLE_OMP
 
 !-------------------------------------------------------------------------------
 !
@@ -497,8 +513,8 @@ ZWORK(:) = 0.
 ZWEIGHT(:,:) = 0.0
 ZSUM_COVER_WEIGHT_PATCH(:) = 0.
 !
-DO JVEG=1,NVEGTYPE
-  PATCH_LIST(JVEG) = VEGTYPE_TO_PATCH (JVEG, KNPATCH)
+DO JVEG=1,NVEGTYPE+NVEG_IRR
+  CALL VEGTYPE_TO_PATCH_IRRIG(JVEG,KNPATCH,NPAR_VEG_IRR_USE,PATCH_LIST(JVEG))
 ENDDO
 !
 JCOVER = 0
@@ -519,45 +535,140 @@ ENDDO
   !
 JCOVER=0
 !
-DO JCOVER=1,ICOVER
+IF (HATYPE=='ARI' .OR. HATYPE=='ARV' .OR. HATYPE=='INV' .OR. HATYPE=='CDN') THEN
   !
-  JJ = IMASK0(JCOVER)
-  !
-  DO JVEG=1,NVEGTYPE
+  DO JCOVER=1,ICOVER
     !
-    JP= PATCH_LIST(JVEG)
-    IF (JP/=KPATCH) CYCLE
+    JJ = IMASK0(JCOVER)
     !
-    IF (ZWEIGHT(JCOVER,JVEG)/=0.) THEN
+    DO JVEG=1,NVEGTYPE+NVEG_IRR
       !
-      IF (HATYPE=='ARI') THEN
-        ZVAL(:) = PDATA(JJ,JVEG)
-      ELSEIF (HATYPE=='INV') THEN
-        ZVAL(:) = 1. / PDATA(JJ,JVEG)
-      ELSEIF (HATYPE=='CDN') THEN
-        DO JI=1,SIZE(ZVAL)
-          ZVAL(JI) = 1./(LOG(ZDZ(JI)/PDATA(JJ,JVEG)))**2 
+      JP= PATCH_LIST(JVEG)
+      IF (JP/=KPATCH) CYCLE
+      !
+      JK = JVEG
+      IF (JVEG > NVEGTYPE) JK = NPAR_VEG_IRR_USE( JVEG - NVEGTYPE )
+      !
+      IF (ZWEIGHT(JCOVER,JK)/=0.) THEN
+        !
+        IF (HATYPE=='ARI' .OR. HATYPE=='ARV') THEN
+          ZVAL(:) = PDATA(JJ,JK)
+        ELSEIF (HATYPE=='INV') THEN
+          ZVAL(:) = 1. / PDATA(JJ,JK)
+        ELSEIF (HATYPE=='CDN') THEN
+          DO JI=1,SIZE(ZVAL)
+            ZVAL(JI) = 1./(LOG(ZDZ(JI)/PDATA(JJ,JK)))**2 
+          ENDDO
+        ENDIF
+        !
+        IF (  NVEG_IRR /= 0 ) THEN
+          ZXIRRIG(:) = 0.
+          WHERE ( PIRRIG(:,JK) /= XUNDEF ) ZXIRRIG(:) = PIRRIG(:,JK)
+        ENDIF
+        !
+        DO JI=1,SIZE(PFIELD)
+
+          IMASK = KMASK(JI)
+
+          IF (PCOVER(IMASK,JCOVER)/=0.) THEN
+            !
+            IF ( NVEG_IRR == 0 ) THEN
+              ! case without irrigation
+              ZCOVER_WEIGHT =  PCOVER(IMASK,JCOVER) * ZWEIGHT(JCOVER,JK)
+            ELSEIF ( JVEG <= NVEGTYPE .AND. ZXIRRIG(IMASK) == 0. ) THEN  ! JI or IMASK?
+              ! case for a vegtype non irrigated or if it is not irrigation for this vegtype in this point
+              ZCOVER_WEIGHT =  PCOVER(IMASK,JCOVER) * ZWEIGHT(JCOVER,JK)
+            ELSEIF ( JVEG <= NVEGTYPE ) THEN
+              ! case the irrigation patch have to be taken into account and a fraction of the vegtype is irrigated (not this part)
+              ZCOVER_WEIGHT =  PCOVER(IMASK,JCOVER) * ( 1 - ZXIRRIG(IMASK) ) * ZWEIGHT(JCOVER,JK)
+            ELSE
+              ! case the irrigation patch have to be taken into account and a fraction of the vegtype is irrigated (this part)
+              ZCOVER_WEIGHT =  PCOVER(IMASK,JCOVER) * ZXIRRIG(IMASK) * ZWEIGHT(JCOVER,JK)
+            ENDIF
+            !
+            !ZCOVER_WEIGHT =  PCOVER(IMASK,JCOVER) * ZWEIGHT(JCOVER,JK)      
+            ZSUM_COVER_WEIGHT_PATCH(JI) = ZSUM_COVER_WEIGHT_PATCH(JI) + ZCOVER_WEIGHT
+            ZWORK(JI) = ZWORK(JI) + ZVAL(JI) * ZCOVER_WEIGHT
+          ENDIF
         ENDDO
-      ELSE
-        CALL ABOR1_SFX('AV_1PATCH_PGD_1D: (1) AVERAGING TYPE NOT ALLOWED')
+        !
       ENDIF
       !
-      DO JI=1,SIZE(PFIELD)
-
-        IMASK = KMASK(JI)
-
-        IF (PCOVER(IMASK,JCOVER)/=0.) THEN
-          ZCOVER_WEIGHT =  PCOVER(IMASK,JCOVER) * ZWEIGHT(JCOVER,JVEG)      
-          ZSUM_COVER_WEIGHT_PATCH(JI) = ZSUM_COVER_WEIGHT_PATCH(JI) + ZCOVER_WEIGHT
-          ZWORK(JI) = ZWORK(JI) + ZVAL(JI) * ZCOVER_WEIGHT
+    ENDDO
+    !
+  ENDDO
+ELSEIF (HATYPE=='MAJ' .OR. HATYPE=='MA1') THEN
+  !
+  DO JI = 1,SIZE(KMASK)
+    !
+    IMASK = KMASK(JI)
+    !
+    ZMAX0 = 0.
+    JVEG0 = 0
+    !
+    DO JVEG = 1,NVEGTYPE+NVEG_IRR
+      !
+      JP = PATCH_LIST(JVEG)
+      IF (JP/=KPATCH) CYCLE
+      !
+      JK = JVEG
+      IF (JVEG > NVEGTYPE) JK = NPAR_VEG_IRR_USE( JVEG - NVEGTYPE )
+      !
+      !ZMAX1 = MAXVAL(PCOVER(IMASK,:)*ZWEIGHT(:,JK))
+      ZMAX1 = 0.
+      ID = 0
+      ZXIRRIG2 = 0.
+      IF (  NVEG_IRR /= 0 .AND. PIRRIG(IMASK,JK) /= XUNDEF ) ZXIRRIG2 = PIRRIG(IMASK,JK)
+      !  
+      DO JCOVER=1,ICOVER
+        !
+        IF ( JVEG <= NVEGTYPE .AND. ZXIRRIG2 == 0. ) THEN  ! JI or IMASK?
+          ! case (1) without irrigation, or (2) for a vegtype non irrigated or if it is not irrigation for this vegtype in this point
+          IF ( ZMAX1 <= PCOVER(IMASK,JCOVER) * ZWEIGHT(JCOVER,JK)                   &
+                  .AND. ( HATYPE=='MAJ' .OR. (PDATA(IMASK0(JCOVER),JK)/=0..AND.PDATA(IMASK0(JCOVER),JK)/=XUNDEF) ) ) THEN
+            ZMAX1 = PCOVER(IMASK,JCOVER) * ZWEIGHT(JCOVER,JK)
+            ZCOVER_WEIGHT =  PCOVER(IMASK,JCOVER) * ZWEIGHT(JCOVER,JK)
+            ID = JCOVER
+          ENDIF
+          !
+        ELSEIF ( JVEG <= NVEGTYPE ) THEN
+          ! case the irrigation patch have to be taken into account and a fraction of the vegtype is irrigated (not this part)
+          IF ( ZMAX1 <= PCOVER(IMASK,JCOVER) * ( 1 - ZXIRRIG2 ) * ZWEIGHT(JCOVER,JK) &
+                  .AND. ( HATYPE=='MAJ' .OR. (PDATA(IMASK0(JCOVER),JK)/=0..AND.PDATA(IMASK0(JCOVER),JK)/=XUNDEF) ) ) THEN
+            ZMAX1 = PCOVER(IMASK,JCOVER) * ( 1 - ZXIRRIG2 ) * ZWEIGHT(JCOVER,JK)
+            ID = JCOVER
+          ENDIF
+          !
+        ELSE
+          ! case the irrigation patch have to be taken into account and a fraction of the vegtype is irrigated (this part)
+          IF ( ZMAX1 <= PCOVER(IMASK,JCOVER) * ZXIRRIG2 * ZWEIGHT(JCOVER,JK)        &
+                  .AND. ( HATYPE=='MAJ' .OR. (PDATA(IMASK0(JCOVER),JK)/=0..AND.PDATA(IMASK0(JCOVER),JK)/=XUNDEF) ) ) THEN
+            ZMAX1 = PCOVER(IMASK,JCOVER) * ZXIRRIG2 * ZWEIGHT(JCOVER,JK)
+            ID = JCOVER
+          ENDIF
+          !
         ENDIF
       ENDDO
       !
+      IF ( ZMAX1>ZMAX0 ) THEN !.AND. ( HATYPE=='MAJ' .OR. PDATA(IMASK0(MAXVAL(MAXLOC(PCOVER(IMASK,:)*ZWEIGHT(:,JK)))),JK)/=0. ) ) THEN ! Tested ?
+        !ID0 = MAXVAL(MAXLOC(PCOVER(IMASK,:)*ZWEIGHT(:,JK)))
+        ID0 = ID
+        ZMAX0 = ZMAX1
+        JVEG0 = JK
+      ENDIF
+      !
+    ENDDO
+    !
+    IF (JVEG0>0) THEN
+      ZWORK(JI) = PDATA(IMASK0(ID0),JVEG0)
+      ZSUM_COVER_WEIGHT_PATCH(JI) = 1.
     ENDIF
     !
   ENDDO
   !
-ENDDO
+ELSE
+  CALL ABOR1_SFX('AV_PATCH_PGD_1D_1P: (1) AVERAGING TYPE NOT ALLOWED : "'//HATYPE//'"')
+ENDIF  
 !
 !-------------------------------------------------------------------------------
   
@@ -572,7 +683,7 @@ ENDDO
 !*    4.2    Arithmetic averaging
 !            --------------------
 !
-  CASE ('ARI')
+  CASE ('ARI','ARV')
 !   
     DO JI=1,SIZE(PFIELD)
       IF (ZSUM_COVER_WEIGHT_PATCH(JI)>0.) PFIELD(JI) =  ZWORK(JI) / ZSUM_COVER_WEIGHT_PATCH(JI)
@@ -602,6 +713,17 @@ ENDDO
 !
 !-------------------------------------------------------------------------------
 !
+!*    4.4    Majoritary averaging
+!            --------------------
+!
+  CASE('MAJ','MA1' )
+!
+    WHERE ( ZSUM_COVER_WEIGHT_PATCH(:) >0. )
+      PFIELD(:) = ZWORK(:)
+    END WHERE
+!
+!-------------------------------------------------------------------------------
+!
   CASE DEFAULT
     CALL ABOR1_SFX('AV_1PATCH_PGD_1D_1P: (2) AVERAGING TYPE NOT ALLOWED')
 !
@@ -614,7 +736,7 @@ IF (LHOOK) CALL DR_HOOK('MODI_AV_PGD_1P:AV_1PATCH_PGD_1D_1P',1,ZHOOK_HANDLE)
 END SUBROUTINE AV_PATCH_PGD_1D_1P
 !
 !     ################################################################
-      SUBROUTINE MAJOR_PATCH_PGD_1D_1P(TFIELD,PCOVER,TDATA,HSFTYPE,HATYPE,&
+      SUBROUTINE MAJOR_PATCH_PGD_1D_1P(TFIELD,PCOVER,TDATA,PIRRIG,NPAR_VEG_IRR_USE,HSFTYPE,HATYPE,&
                       OCOVER,KMASK,KNPATCH,KPATCH,KDECADE)
 !     ################################################################
 !
@@ -644,6 +766,7 @@ END SUBROUTINE AV_PATCH_PGD_1D_1P
 !!    ------------
 !!
 !!    Original    06/2006
+!!    A. Druel    02/2019  Compatibility with new irrigation (duplication of patches) and add MA1 and ARV possibility (without taking into account the zeros)
 !!
 !----------------------------------------------------------------------------
 !
@@ -653,8 +776,9 @@ END SUBROUTINE AV_PATCH_PGD_1D_1P
 USE MODD_TYPE_DATE_SURF
 USE MODD_SURF_PAR,       ONLY : XUNDEF, NUNDEF
 USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE
+USE MODD_AGRI,           ONLY : NVEG_IRR
 !
-USE MODI_VEGTYPE_TO_PATCH
+USE MODI_VEGTYPE_TO_PATCH_IRRIG
 USE MODE_AV_PGD
 !
 USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
@@ -665,17 +789,19 @@ IMPLICIT NONE
 !*    0.1    Declaration of arguments
 !            ------------------------
 !
-TYPE (DATE_TIME), DIMENSION(:), INTENT(OUT) :: TFIELD  ! secondary field to construct
-REAL, DIMENSION(:,:), INTENT(IN)  :: PCOVER  ! fraction of each cover class
+TYPE (DATE_TIME), DIMENSION(:),   INTENT(OUT) :: TFIELD  ! secondary field to construct
+REAL,             DIMENSION(:,:), INTENT(IN)  :: PCOVER  ! fraction of each cover class
 TYPE (DATE_TIME), DIMENSION(:,:), INTENT(IN)  :: TDATA   ! secondary field value for each class
- CHARACTER(LEN=3),     INTENT(IN)  :: HSFTYPE ! Type of surface where the field
+REAL,             DIMENSION(:,:), INTENT(IN)  :: PIRRIG  ! fraction of irrigation for each vegtype
+INTEGER,          DIMENSION(:),   INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
+ CHARACTER(LEN=3),                INTENT(IN)  :: HSFTYPE ! Type of surface where the field
                                                ! is defined
- CHARACTER(LEN=3),     INTENT(IN)  :: HATYPE  ! Type of averaging
-LOGICAL, DIMENSION(:), INTENT(IN) :: OCOVER
-INTEGER, DIMENSION(:), INTENT(IN) :: KMASK
-INTEGER, INTENT(IN) :: KNPATCH
-INTEGER, INTENT(IN) :: KPATCH
-INTEGER,     INTENT(IN), OPTIONAL :: KDECADE ! current month
+ CHARACTER(LEN=3),                INTENT(IN)  :: HATYPE  ! Type of averaging
+LOGICAL,          DIMENSION(:),   INTENT(IN)  :: OCOVER
+INTEGER,          DIMENSION(:),   INTENT(IN)  :: KMASK
+INTEGER,                          INTENT(IN)  :: KNPATCH
+INTEGER,                          INTENT(IN)  :: KPATCH
+INTEGER, INTENT(IN), OPTIONAL                 :: KDECADE ! current month
 !
 !*    0.2    Declaration of local variables
 !            ------------------------------
@@ -684,8 +810,9 @@ INTEGER :: JJ, IMASK
 INTEGER :: ICOVER  ! number of cover classes
 INTEGER :: JCOVER  ! loop on cover classes
 !
-INTEGER :: JVEG! loop on vegtype
+INTEGER :: JVEG, JK! loop on vegtype
 !
+REAL    :: ZXIRRIG
 INTEGER, DIMENSION(SIZE(PCOVER,2),NVEGTYPE)      :: IDATA_DOY
 INTEGER, DIMENSION(SIZE(PCOVER,1))               :: IDOY
 REAL,    DIMENSION(365)                          :: ZCOUNT
@@ -720,15 +847,33 @@ DO JP = 1,SIZE(TFIELD)
   !
   ZCOUNT(:) = 0.
   !
-  DO JVEG=1,NVEGTYPE
+  DO JVEG=1,NVEGTYPE+NVEG_IRR
     !
-    IF(KPATCH==VEGTYPE_TO_PATCH(JVEG,KNPATCH)) THEN
+    CALL VEGTYPE_TO_PATCH_IRRIG(JVEG,KNPATCH,NPAR_VEG_IRR_USE,JJ)
+    !
+    JK = JVEG
+    IF (JVEG > NVEGTYPE) JK = NPAR_VEG_IRR_USE( JVEG - NVEGTYPE )
+    !
+    IF( KPATCH == JJ ) THEN
+      !
+      ZXIRRIG = 0.
+      IF (  NVEG_IRR /= 0 .AND. PIRRIG(IMASK,JK) /= XUNDEF ) ZXIRRIG = PIRRIG(IMASK,JK)
       !
       DO JCOVER = 1,SIZE(PCOVER,2)
         !
-        IF (IDATA_DOY(JCOVER,JVEG) /= NUNDEF .AND. PCOVER(IMASK,JCOVER)/=0.) THEN
+        IF (IDATA_DOY(JCOVER,JK) /= NUNDEF .AND. PCOVER(IMASK,JCOVER)/=0.) THEN
           !
-          ZCOUNT(IDATA_DOY(JCOVER,JVEG)) = ZCOUNT(IDATA_DOY(JCOVER,JVEG)) + PCOVER(IMASK,JCOVER)
+          !ZCOUNT(IDATA_DOY(JCOVER,JK)) = ZCOUNT(IDATA_DOY(JCOVER,JK)) + PCOVER(IMASK,JCOVER)
+          IF ( JVEG <= NVEGTYPE .AND. ZXIRRIG == 0. ) THEN
+            ! case (1) without irrigation, or (2) for a vegtype non irrigated or if it is not irrigation for this vegtype in this point
+            ZCOUNT(IDATA_DOY(JCOVER,JK)) = ZCOUNT(IDATA_DOY(JCOVER,JK)) + PCOVER(IMASK,JCOVER)
+          ELSEIF ( JVEG <= NVEGTYPE ) THEN
+            ! case the irrigation patch have to be taken into account and a fraction of the vegtype is irrigated (not this part)
+            ZCOUNT(IDATA_DOY(JCOVER,JK)) = ZCOUNT(IDATA_DOY(JCOVER,JK)) + PCOVER(IMASK,JCOVER) * ( 1 - ZXIRRIG )
+          ELSE
+            ! case the irrigation patch have to be taken into account and a fraction of the vegtype is irrigated (this part)
+            ZCOUNT(IDATA_DOY(JCOVER,JK)) = ZCOUNT(IDATA_DOY(JCOVER,JK)) + PCOVER(IMASK,JCOVER) * ZXIRRIG
+          ENDIF
           !
         END IF
         !

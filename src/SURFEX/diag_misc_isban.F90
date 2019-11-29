@@ -4,7 +4,7 @@
 !SFX_LIC for details. version 1.
 !     #########
 SUBROUTINE DIAG_MISC_ISBA_n (DMK, KK, PK, PEK, AGK, IO, OSURF_MISC_BUDGET, &
-                             OVOLUMETRIC_SNOWLIQ, PTSTEP, OAGRIP, PTIME, KSIZE  )  
+                             OVOLUMETRIC_SNOWLIQ, PTSTEP, PTIME, KSIZE  )  
 !     ###############################################################################
 !
 !!****  *DIAG_MISC-ISBA_n * - additional diagnostics for ISBA
@@ -36,6 +36,7 @@ SUBROUTINE DIAG_MISC_ISBA_n (DMK, KK, PK, PEK, AGK, IO, OSURF_MISC_BUDGET, &
 !!       B. Decharme 05/2012 : Carbon fluxes in diag_evap
 !!       B. Decharme 05/2012 : Active and frozen layers thickness for dif
 !!       B. Decharme 06/2013 : Snow temp for EBA scheme (XP_SNOWTEMP not allocated)
+!!       A. Druel    02/2019 : Remove XSEUIL and associated LARGIP flag (for irrigation)
 !!
 !!------------------------------------------------------------------
 !
@@ -70,7 +71,6 @@ TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
 LOGICAL, INTENT(IN) :: OSURF_MISC_BUDGET
 LOGICAL, INTENT(IN) :: OVOLUMETRIC_SNOWLIQ
 REAL,    INTENT(IN) :: PTSTEP        ! timestep for  accumulated values 
-LOGICAL, INTENT(IN) :: OAGRIP
 REAL,    INTENT(IN) :: PTIME   ! current time since midnight
 INTEGER, INTENT(IN) :: KSIZE
 !
@@ -191,13 +191,6 @@ IF (OSURF_MISC_BUDGET) THEN
   !
 END IF
 !
-IF (OAGRIP) THEN
-  !
-  DO JI=1,KSIZE
-    DMK%XSEUIL   (JI)  =  AGK%XTHRESHOLDSPT (JI)
-  END DO
-!
-END IF
 IF (LHOOK) CALL DR_HOOK('DIAG_MISC_ISBA_N',1,ZHOOK_HANDLE)
 !-------------------------------------------------------------------------------------
 !

@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-SUBROUTINE UPDATE_RAD_ISBA_n (IO, S, KK, PK, PEK, KPATCH, PZENITH, PSW_BANDS, &
+SUBROUTINE UPDATE_RAD_ISBA_n (IO, S, KK, PK, PEK, KPATCH, PZENITH, PSW_BANDS, NPAR_VEG_IRR_USE, &
                               PDIR_ALB_WITH_SNOW,PSCA_ALB_WITH_SNOW, PEMIST,  &
                               PDIR_SW, PSCA_SW     )
 !     ####################################################################
@@ -29,9 +29,10 @@ SUBROUTINE UPDATE_RAD_ISBA_n (IO, S, KK, PK, PEK, KPATCH, PZENITH, PSW_BANDS, &
 !!
 !!    MODIFICATIONS
 !!    -------------
-!!      Original    09/2009
+!!      Original      09/2009
 !!      P. Samuelsson 02/2012 MEB
 !!      A. Boone      03/2015 MEB-use TR_ML scheme for SW radiation
+!!      A. Druel      02/2019 transmit NPAR_VEG_IRR_USE for irrigation
 !!------------------------------------------------------------------
 !
 !
@@ -77,6 +78,8 @@ INTEGER, INTENT(IN) :: KPATCH
 !
 REAL, DIMENSION(:),     INTENT(IN)   :: PZENITH   ! Zenithal angle at t+1
 REAL, DIMENSION(:),     INTENT(IN)   :: PSW_BANDS ! mean wavelength of each shortwave band (m)
+!
+INTEGER,DIMENSION(:), INTENT(IN)     :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 REAL, DIMENSION(:,:), INTENT(OUT)  :: PDIR_ALB_WITH_SNOW ! Total direct albedo at t+1
 REAL, DIMENSION(:,:), INTENT(OUT)  :: PSCA_ALB_WITH_SNOW ! Total diffuse albedo at t+1
@@ -226,7 +229,7 @@ IF(IO%LMEB_PATCH(KPATCH))THEN
               ZGLOBAL_SW, ZLAIN, ZZENITH, S%XABC,                                &
               PEK%XFAPARC, PEK%XFAPIRC, PEK%XMUS, PEK%XLAI_EFFC, GSHADE, ZIACAN, &              
               ZIACAN_SUNLIT, ZIACAN_SHADE, ZFRAC_SUN,                            &
-              ZFAPAR, ZFAPIR, ZFAPAR_BS, ZFAPIR_BS                               )    
+              ZFAPAR, ZFAPIR, ZFAPAR_BS, ZFAPIR_BS, NPAR_VEG_IRR_USE             )    
 
       ! Total effective surface (canopy, ground/flooded zone, snow) all-wavelength
       ! albedo: diagnosed from shortwave energy budget closure.

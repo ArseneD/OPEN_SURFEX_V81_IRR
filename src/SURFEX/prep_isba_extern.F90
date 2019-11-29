@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-SUBROUTINE PREP_ISBA_EXTERN (DTCO, IO, U, GCP, &
+SUBROUTINE PREP_ISBA_EXTERN (DTCO, IO, U, GCP, NPAR_VEG_IRR_USE, &
                              HPROGRAM,HSURF,HFILE,HFILETYPE,HFILEPGD,HFILEPGDTYPE,KLUOUT,PFIELD,OKEY)
 !     #################################################################################
 !
@@ -27,6 +27,8 @@ SUBROUTINE PREP_ISBA_EXTERN (DTCO, IO, U, GCP, &
 !!    -------------
 !!      Original    01/2004
 !!      B. Decharme  04/2014, external init with FA files
+!!      A. Druel     02/2019, transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !!------------------------------------------------------------------
 !
 USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
@@ -63,6 +65,7 @@ TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
 TYPE(SURF_ATM_t), INTENT(INOUT) :: U
 TYPE(GRID_CONF_PROJ_t),INTENT(INOUT) :: GCP
 !
+INTEGER,DIMENSION(:), INTENT(IN) :: NPAR_VEG_IRR_USE ! vegtype with irrigation
  CHARACTER(LEN=6),   INTENT(IN)  :: HPROGRAM  ! program calling surf. schemes
  CHARACTER(LEN=7),   INTENT(IN)  :: HSURF     ! type of field
  CHARACTER(LEN=28),  INTENT(IN)  :: HFILE     ! name of file
@@ -162,7 +165,8 @@ SELECT CASE(HSURF)
 !
   CASE('TG    ','WG    ','WGI   ')
 !* reading of the profile and its depth definition
-     CALL READ_EXTERN_ISBA(U, DTCO, GCP, IO, HFILE,HFILETYPE,HFILEPGD,HFILEPGDTYPE,&
+     CALL READ_EXTERN_ISBA(U, DTCO, GCP, IO, NPAR_VEG_IRR_USE,    &
+                           HFILE,HFILETYPE,HFILEPGD,HFILEPGDTYPE, &
                            KLUOUT,INI,HSURF,HSURF,ZFIELD,ZD,OKEY)
 ! 
     IF (INI>0) THEN

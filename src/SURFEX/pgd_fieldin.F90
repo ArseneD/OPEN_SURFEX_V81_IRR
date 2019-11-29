@@ -40,6 +40,8 @@
 !!
 !!    02/2014 (B. Decharme):     interpolation of the lake depth 
 !!                               re-allowed but using the nearest point
+!!    02/2019 (A. Druel):        Add MA1 possibility
+!!
 !----------------------------------------------------------------------------
 !
 !*    0.     DECLARATION
@@ -209,7 +211,7 @@ IF (LEN_TRIM(HFILE)/=0) THEN
 !
   NSIZE_ALL(:,1) = 0
 !
-  IF (CATYPE=='MAJ') THEN
+  IF (CATYPE=='MAJ' .OR. CATYPE=='MA1' ) THEN
     ALLOCATE(NVALNBR  (U%NDIM_FULL,1))
     ALLOCATE(NVALCOUNT(U%NDIM_FULL,JPVALMAX,1))
     ALLOCATE(XVALLIST (U%NDIM_FULL,JPVALMAX,1))
@@ -294,7 +296,7 @@ IF (LEN_TRIM(HFILE)/=0) THEN
   DO JT=1,SIZE(NSIZE,2)
 
     IF (.NOT.U%LECOSG.AND.JT>NVEGTYPE_OLD) EXIT
-
+    
     !multitype input file
     IF (SIZE(ZFIELD,2)>1) THEN
 

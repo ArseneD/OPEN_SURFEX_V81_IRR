@@ -206,8 +206,8 @@ IMPLICIT NONE
 !
 !
  CHARACTER(LEN=12),  INTENT(IN)  :: HREC      ! name of the article to be read
- CHARACTER(LEN=40),  INTENT(IN)  :: HFIELD    ! the integer to be read
-INTEGER,            INTENT(OUT) :: KRESP     ! KRESP  : return-code if a problem appears
+ CHARACTER(LEN=160),  INTENT(IN) :: HFIELD   ! the integer to be read
+INTEGER,            INTENT(OUT)  :: KRESP      ! KRESP  : return-code if a problem appears
  CHARACTER(LEN=100), INTENT(IN)  :: HCOMMENT  ! comment string
 !
 !*      0.2   Declarations of local variables
@@ -226,7 +226,7 @@ IF (GFOUND) RETURN
 !
 WRITE(NUNIT,FMT=*,ERR=100) '&'//CMASK//' '//HREC
 WRITE(NUNIT,FMT='(A50)',ERR=100) HCOMMENT(1:50)
-WRITE(NUNIT,FMT='(A40)',ERR=100) HFIELD
+WRITE(NUNIT,FMT='(A160)',ERR=100) HFIELD
 !
 IF (LHOOK) CALL DR_HOOK('MODE_WRITE_SURF_ASC:WRITE_SURFC0_ASC',1,ZHOOK_HANDLE)
 RETURN

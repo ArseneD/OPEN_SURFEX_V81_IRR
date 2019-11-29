@@ -53,7 +53,7 @@ SUBROUTINE INIT_ISBA_n (DTCO, OREAD_BUDGETC, UG, U, USS, GCP, IM, DTZ,&
 !!      J.Escobar      11/13 : add USE MODI_DEFAULT_CROCUS
 !!      B. Decharme  04/2013 new coupling variables
 !!      P. Samuelsson  10/14 : MEB
-!!
+!!      A. Druel     02/2019 : adapt the code to be compatible with irrigation
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
@@ -73,6 +73,7 @@ USE MODD_SV_n, ONLY : SV_t
 !
 USE MODD_TYPE_DATE_SURF, ONLY : DATE
 !
+USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE
 USE MODD_DATA_COVER,     ONLY : XDATA_LAI, XDATA_H_TREE,                          &
                                 XDATA_ALBNIR_VEG, XDATA_ALBVIS_VEG,               &
                                 XDATA_ALBUV_VEG, XDATA_RSMIN,                     &
@@ -90,7 +91,7 @@ USE MODD_DATA_COVER,     ONLY : XDATA_LAI, XDATA_H_TREE,                        
 USE MODD_WRITE_SURF_ATM,  ONLY : LSPLIT_PATCH
 USE MODD_SURF_ATM,       ONLY : LCPL_GCM
 USE MODD_SURF_PAR,       ONLY : XUNDEF, NUNDEF
-USE MODD_AGRI,           ONLY : LAGRIP
+USE MODD_AGRI,           ONLY : LIRRIGMODE, NPATCH_TREE !, LAGRIP !#metoo for LIRRIGMODE
 !
 USE MODE_TARTES, ONLY : INIT_TARTES
 USE MODE_SNOWCRO_FLANNER, ONLY : READ_FZ06
@@ -186,9 +187,10 @@ REAL                :: ZSPINCO2
 INTEGER             :: ISPINEND
 !
 INTEGER             :: ILUOUT   ! unit of output listing file
-INTEGER             :: IVERSION       ! surface version
-INTEGER             :: IRESP   ! return code
+INTEGER             :: IVERSION ! surface version
+INTEGER             :: IRESP    ! return code
 INTEGER             :: ISIZE_LMEB_PATCH   ! Number of patches where multi-energy balance should be applied
+INTEGER             :: NMONTH, NDAY       ! Day and month of the simulation (if define)    
 !
  CHARACTER(LEN=3) :: YSNOW_SCHEME
 INTEGER :: ISNOW_NLAYER, JP
@@ -198,7 +200,6 @@ REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !-------------------------------------------------------------------------------
 !
 !               Initialisation for IO
-!
 !
 IF (LHOOK) CALL DR_HOOK('INIT_ISBA_N',0,ZHOOK_HANDLE)
  CALL GET_LUOUT(HPROGRAM,ILUOUT)
@@ -212,10 +213,10 @@ END IF
 IF (LNAM_READ) THEN
  !
  !*       0.     Defaults
-!               --------
-
+ !               --------
+ !
  !        0.1. Hard defaults
- !      
+ !     
  CALL DEFAULT_ISBA(IM%O%XTSTEP, IM%O%XOUT_TSTEP,                                   &
                    IM%O%CRUNOFF, IM%O%CSCOND,                                      &
                    IM%O%CC1DRY, IM%O%CSOILFRZ, IM%O%CDIFSFCOND, IM%O%CSNOWRES,     &
@@ -245,7 +246,7 @@ ENDIF
 !
  CALL READ_ISBA_CONF_n(IM%CHI, IM%ID%DE, IM%ID%O, IM%ID%DM, IM%O, HPROGRAM)
 !
-CALL INIT_IO_SURF_n(DTCO, U, HPROGRAM,'FULL  ','ISBA  ','READ ')
+ CALL INIT_IO_SURF_n(DTCO, U, HPROGRAM,'FULL  ','ISBA  ','READ ')
  CALL READ_SURF(HPROGRAM,'VERSION',IVERSION,IRESP)
  CALL END_IO_SURF_n(HPROGRAM)
 !
@@ -337,7 +338,7 @@ END SELECT
 ! initialization for I/O
 !
  CALL SET_SURFEX_FILEIN(HPROGRAM,'PGD ') ! change input file name to pgd name
-CALL INIT_IO_SURF_n(DTCO, U, HPROGRAM,'NATURE','ISBA  ','READ ')
+ CALL INIT_IO_SURF_n(DTCO, U, HPROGRAM,'NATURE','ISBA  ','READ ')
 !
 !
 !*       2.1    Cover, soil and orographic fields:
@@ -359,16 +360,17 @@ ISIZE_LMEB_PATCH=COUNT(IM%O%LMEB_PATCH(:))
 !*       2.2    Check:
 !               ------
 !
-IF ( IM%O%CPHOTO/='NON' .AND. IM%O%NPATCH/=12 .AND. IM%O%NPATCH/=19 )THEN
+IF ( IM%O%CPHOTO/='NON' .AND. ( IM%O%NPATCH < 12 .OR. ( U%LECOSG.AND.LIRRIGMODE .AND. IM%O%NPATCH < 15 .AND. NPATCH_TREE == 0 ) &
+                                                 .OR. ( NPATCH_TREE /= 0 .AND. NPATCH_TREE < 12) ) ) THEN
   CALL ABOR1_SFX('INIT_ISBAN: INCONSISTENCY BETWEEN CPHOTO AND NPATCH')
 ENDIF
 !
 IF (HINIT=='PRE' .AND. YSNOW_SCHEME.NE.'3-L' .AND. YSNOW_SCHEME.NE.'CRO' .AND. IM%O%CISBA=='DIF') THEN
     CALL ABOR1_SFX("INIT_ISBAN: WITH CISBA = DIF, CSNOW MUST BE 3-L OR CRO")
 ENDIF
-IF ( IM%O%CPHOTO/='NIT' .AND. IM%O%CPHOTO/='NCB' .AND. LAGRIP) THEN
-  CALL ABOR1_SFX('INIT_ISBAN: INCONSISTENCY BETWEEN CPHOTO AND LAGRIP')
-ENDIF
+!IF ( IM%O%CPHOTO/='NIT' .AND. IM%O%CPHOTO/='NCB' .AND. LAGRIP) THEN
+!  CALL ABOR1_SFX('INIT_ISBAN: INCONSISTENCY BETWEEN CPHOTO AND LAGRIP')
+!ENDIF
 IF ( IM%O%CPHOTO/='NCB' .AND. IM%O%CRESPSL=='CNT') THEN
   CALL ABOR1_SFX('INIT_ISBAN: INCONSISTENCY BETWEEN CPHOTO AND CRESPSL')
 ENDIF
@@ -463,13 +465,22 @@ IF (OLAND_USE .OR. HINIT=='PGD') THEN
   RETURN
 END IF
 !
+IF ( HINIT == 'PRE' ) THEN ! IF 'PRE': KDAY and KMONTH not define. No impact (it's only for irrigation)
+  NMONTH = 1
+  NDAY = 1
+ELSEIF (KDAY == NUNDEF) THEN
+  CALL ABOR1_SFX('INIT_ISBAN: FATAL ERROR, DATE NOT DEFINE (extend 1st CASE)')
+ELSE
+  NMONTH  = KMONTH
+  NDAY = KDAY
+ENDIF
 CALL COMPUTE_ISBA_PARAMETERS(DTCO, OREAD_BUDGETC, UG, U,                    &
                              IM%O, IM%DTV, IM%SB, IM%S, IM%G, IM%K, IM%NK,  &
                              IM%NG, IM%NP, IM%NPE, IM%NAG, IM%NISS, IM%ISS, &
                              IM%NCHI, IM%CHI, IM%ID, IM%GB, IM%NGB,         &
                              NDST, SLT, SV, HPROGRAM,HINIT,OLAND_USE,       &
-                             KI,KSV,KSW, HSV,ZCO2,PRHOA,                &
-                             PZENITH,PSW_BANDS,PDIR_ALB,PSCA_ALB,       &
+                             KI,NMONTH,NDAY,KSV,KSW, HSV,ZCO2,PRHOA,         &
+                             PZENITH,PSW_BANDS,PDIR_ALB,PSCA_ALB,           &
                              PEMIS,PTSRAD,PTSURF,HTEST                  )
 !
 IF ( IM%O%CSNOWMETAMO/="B92" ) THEN

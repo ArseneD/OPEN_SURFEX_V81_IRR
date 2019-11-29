@@ -3,8 +3,8 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-      SUBROUTINE CH_INIT_DEP_ISBA_n (CHI, NCHI, NP, DTCO, KPATCH, OCOVER, PCOVER, &
-                                     KCH,KLUOUT,KLU)
+      SUBROUTINE CH_INIT_DEP_ISBA_n (CHI, NCHI, NP, DTCO, KPATCH, &
+                                     OCOVER, PCOVER, KCH,KLUOUT,KLU,PIRRIG,NPAR_VEG_IRR_USE)
 !!    ##################################################
 !!
 !!*** *CH_INIT_DEP_ISBA_n*
@@ -57,6 +57,7 @@
 !!    18/01/01 (P. Tulet) add patch vegetative class, town and water/sea 
 !!                        for friction velocity and aerodynamical resistance 
 !!    18/07/03 (P. Tulet) surface externalisation
+!!    02/2019  (A. Druel) transmit NPAR_VEG_IRR_USE for irrigation
 !!    
 !!
 !!    EXTERNAL
@@ -101,6 +102,8 @@ REAL, DIMENSION(:,:), INTENT(IN) :: PCOVER
 INTEGER,                         INTENT(IN)  :: KCH      ! chemistry input file
 INTEGER,                         INTENT(IN)  :: KLUOUT   ! output listing channel
 INTEGER,                         INTENT(IN)  :: KLU      ! number of points
+REAL, DIMENSION(:,:),            INTENT(IN)  :: PIRRIG  ! fraction of irrigation for each vegtype
+INTEGER,DIMENSION(:),            INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 !*      0.2    declarations of local variables
 !
@@ -143,7 +146,7 @@ REAL(KIND=JPRB) :: ZHOOK_HANDLE
       ALLOCATE(NCHI%AL(JP)%XSOILRC_O3 (NP%AL(JP)%NSIZE_P))
       !
       CALL CONVERT_COVER_CH_ISBA(DTCO, PCOVER, OCOVER, KPATCH, JP, NP%AL(JP), &
-                               NCHI%AL(JP)%XSOILRC_SO2, NCHI%AL(JP)%XSOILRC_O3)
+                               NCHI%AL(JP)%XSOILRC_SO2, NCHI%AL(JP)%XSOILRC_O3, PIRRIG, NPAR_VEG_IRR_USE)
       !
       !---------------------------------------------------------------------------
       !

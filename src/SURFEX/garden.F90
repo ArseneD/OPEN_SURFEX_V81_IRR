@@ -47,6 +47,7 @@
 !     B. decharme 04/2013 : variables for surf/atm coupling
 !                           dummy for water table / surface coupling
 !!    P. Samuelsson  10/2014  Introduced dummy variables in call to ISBA for MEB
+!!    A. Druel       02/2019 - transmit NPAR_VEG_IRR_USE for irrigation
 !-------------------------------------------------------------------------------
 !
 !*       0.     DECLARATIONS
@@ -71,7 +72,7 @@ USE MODD_TEB_IRRIG_n, ONLY : TEB_IRRIG_t
 USE MODD_ISBA_OPTIONS_n, ONLY : ISBA_OPTIONS_t
 USE MODD_ISBA_n, ONLY : ISBA_S_t, ISBA_K_t, ISBA_P_t, ISBA_PE_t
 !
-USE MODD_AGRI_n, ONLY : AGRI_t,AGRI_INIT
+USE MODD_AGRI_n, ONLY : AGRI_t, AGRI_INIT
 !
 USE MODD_TYPE_DATE_SURF,    ONLY: DATE_TIME
 USE MODD_SURF_PAR,          ONLY: XUNDEF
@@ -229,8 +230,8 @@ GUPDATED=.FALSE.
 GALB = .FALSE. 
 IF (GDO%CPHOTO=='NIT'.OR.GDO%CPHOTO=='NCB') GALB = .TRUE.
 !
-  CALL VEGETATION_UPDATE(DTCO, DTV, G%NDIM, GDO, K, P, PEK, 1,              &
-                         PTSTEP, S%TTIME, TOP%XCOVER, TOP%LCOVER,  .FALSE., &
+  CALL VEGETATION_UPDATE(DTCO, DTV, G%NDIM, GDO, K, P, PEK, 1, 1, 1,                          &
+                         PTSTEP, S%TTIME, TOP%XCOVER, TOP%LCOVER,  .FALSE., .FALSE., .FALSE., &
                          'GRD', GALB, YSS, GUPDATED, OABSENT=(T%XGARDEN==0.)  )
 !
 !
@@ -252,7 +253,7 @@ ALLOCATE(GB%XIACAN(SIZE(PPS),SIZE(S%XABC)))
            PALBNIR_TVEG, PALBVIS_TVEG, PALBNIR_TSOIL, PALBVIS_TSOIL, ZPALPHAN,    &
            ZZ0G_WITHOUT_SNOW, ZZ0_MEBV, ZZ0H_MEBV, ZZ0EFF_MEBV, ZZ0_MEBN,         &
            ZZ0H_MEBN, ZZ0EFF_MEBN, ZTDEEP_A, PCO2, K%XFFG(:), K%XFFV(:),          &
-           ZEMISF, ZUSTAR, PAC_AGG, PHU_AGG, ZRESP_BIOMASS_INST, ZDEEP_FLUX, PIRRIG )     
+           ZEMISF, ZUSTAR, PAC_AGG, PHU_AGG, ZRESP_BIOMASS_INST, ZDEEP_FLUX, PIRRIG, DTV%NPAR_VEG_IRR_USE )
 !
 IF (PEK%TSNOW%SCHEME=='3-L' .OR. PEK%TSNOW%SCHEME=='CRO') PEK%TSNOW%TS(:)= DMK%XSNOWTEMP(:,1)
 !
@@ -271,8 +272,8 @@ ENDIF
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
 IF (GDO%CPHOTO=='NIT') THEN
-  CALL VEGETATION_EVOL(GDO, DTV, P, PEK, .FALSE., PTSTEP, TPTIME%TDATE%MONTH, TPTIME%TDATE%DAY, &
-                       TPTIME%TIME, G%XLAT, PRHOA, PCO2, YSS, ZRESP_BIOMASS_INST )         
+  CALL VEGETATION_EVOL(GDO, DTV, P, PEK, .FALSE., PTSTEP, TPTIME%TDATE%MONTH, TPTIME%TDATE%DAY, & ! OAGRIP = FALSE
+                       TPTIME%TIME, G%XLAT, PRHOA, PCO2, YSS, ZRESP_BIOMASS_INST, .FALSE.)        ! LBIOM_REAP  
 END IF
 !
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

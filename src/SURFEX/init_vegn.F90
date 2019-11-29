@@ -33,6 +33,8 @@ SUBROUTINE INIT_VEG_n(IO, KK, PK, PEK, DTV, &
 !!    MODIFICATIONS
 !!
 !!      B. Decharme    01/16 : Bug when vegetation veg, z0 and emis are imposed whith interactive vegetation
+!!      A. Druel     02/2019 : Transmit NPAR_VEG_IRR_USE for irrigation (+ small modif)
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
@@ -92,21 +94,24 @@ IF (LHOOK) CALL DR_HOOK('INIT_VEG_n',0,ZHOOK_HANDLE)
 !
 !* snow long-wave properties (not initialized in read_gr_snow)
 !
- CALL INIT_SNOW_LW(XEMISSN,PEK%TSNOW)
+IF ( PK%NSIZE_P > 0 ) CALL INIT_SNOW_LW(XEMISSN,PEK%TSNOW)
 !
 !-------------------------------------------------------------------------------
 !
 !* z0 and vegetation fraction estimated from LAI if not imposed
-IF (IO%CPHOTO=='NIT' .OR. IO%CPHOTO=='NCB') THEN
+IF ((IO%CPHOTO=='NIT' .OR. IO%CPHOTO=='NCB') .AND. PK%NSIZE_P > 0 ) THEN
   DO JI=1,PK%NSIZE_P    
     IF(PEK%XLAI(JI)/=XUNDEF) THEN
       PEK%XLAI (JI) = MAX(PEK%XLAIMIN(JI),PEK%XLAI(JI))
       IF (.NOT.DTV%LIMP_Z0)   &
-         PEK%XZ0  (JI) = Z0V_FROM_LAI(PEK%XLAI(JI),PK%XH_TREE(JI),PK%XVEGTYPE_PATCH(JI,:),IO%LAGRI_TO_GRASS)
+         PEK%XZ0  (JI) = Z0V_FROM_LAI(PEK%XLAI(JI),PK%XH_TREE(JI),PK%XVEGTYPE_PATCH(JI,:),IO%LAGRI_TO_GRASS,&
+                                      NPAR_VEG_IRR_USE=DTV%NPAR_VEG_IRR_USE)
       IF (.NOT.DTV%LIMP_VEG)  &
-        PEK%XVEG (JI) = VEG_FROM_LAI(PEK%XLAI(JI),PK%XVEGTYPE_PATCH(JI,:),IO%LAGRI_TO_GRASS)
+        PEK%XVEG (JI) = VEG_FROM_LAI(PEK%XLAI(JI),PK%XVEGTYPE_PATCH(JI,:),IO%LAGRI_TO_GRASS,&
+                                      NPAR_VEG_IRR_USE=DTV%NPAR_VEG_IRR_USE)
       IF (.NOT.DTV%LIMP_EMIS) &
-        PEK%XEMIS(JI) = EMIS_FROM_VEG(PEK%XVEG(JI),PK%XVEGTYPE_PATCH(JI,:))
+        PEK%XEMIS(JI) = EMIS_FROM_VEG(PEK%XVEG(JI),PK%XVEGTYPE_PATCH(JI,:),&
+                                      NPAR_VEG_IRR_USE=DTV%NPAR_VEG_IRR_USE)
     END IF  
   END DO
 END IF

@@ -34,8 +34,10 @@
 !!
 !!    Original    11/09/95
 !!
-!! V. Masson, March 2010     Optimization of some lat/lon boundaries computations
-!!      J.Escobar     06/2013  for REAL4/8 add EPSILON management
+!!    V. Masson,    03/2010  Optimization of some lat/lon boundaries computations
+!!    J. Escobar,   06/2013  for REAL4/8 add EPSILON management
+!!    A. Druel,     02/2019  Add MA1 possibility (without taking into account the zeros)
+!!
 !----------------------------------------------------------------------------
 !
 !*    0.     DECLARATION
@@ -242,7 +244,7 @@ IF (GMULTITYPE) THEN
   DEALLOCATE(NSIZE_ALL)
   ALLOCATE(NSIZE_ALL(U%NDIM_FULL,SUM(NTYPE)))  
   NSIZE_ALL(:,:) = 0
-  IF (CATYPE=='MAJ') THEN
+  IF (CATYPE=='MAJ' .OR. CATYPE=='MA1') THEN
     DEALLOCATE(NVALNBR,NVALCOUNT,XVALLIST)
     ALLOCATE(NVALNBR  (U%NDIM_FULL,SUM(NTYPE)))
     ALLOCATE(NVALCOUNT(U%NDIM_FULL,JPVALMAX,SUM(NTYPE)))
@@ -646,7 +648,7 @@ DO
           CALL PT_BY_PT_TREATMENT(UG, U, USS, &
                                   ILUOUT, ZLAT_WORK(1:IWORK),ZLON_WORK(1:IWORK), &
                                   ZVALUE_WORK(1:IWORK),                          &
-                                  HSUBROUTINE, OMULTITYPE=GMULTITYPE, KFACT=IFACT)  
+                                  HSUBROUTINE, OMULTITYPE=GMULTITYPE, KFACT=IFACT)
 !
 !-------------------------------------------------------------------------------
       END DO

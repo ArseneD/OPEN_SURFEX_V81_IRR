@@ -9,7 +9,7 @@ MODULE MODE_DATES_NETCDF
 ! Author : Matthieu Lafaysse
 ! Creation : 2012-11-12
 
-! Modifications
+! Modifications: A. Druel     02-2019 bugfix
 
 USE MODD_TYPE_DATE_SURF
 
@@ -237,7 +237,7 @@ ELSE
         EXIT
       ELSE
         IREMAININGDAYS=IREMAININGDAYS-TPTIME%TDATE%DAY
-        IF (TPTIME%TDATE%MONTH>=1) THEN
+        IF (TPTIME%TDATE%MONTH>1) THEN ! bugfix
           TPTIME%TDATE%MONTH=TPTIME%TDATE%MONTH-1 !Month change
           TPTIME%TDATE%DAY=INBDM(TPTIME%TDATE%MONTH)
         ELSE

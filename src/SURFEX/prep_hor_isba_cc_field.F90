@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-SUBROUTINE PREP_HOR_ISBA_CC_FIELD (DTCO, U, GCP, KLAT, IO, S, NK, NP, NPE,  &
+SUBROUTINE PREP_HOR_ISBA_CC_FIELD (DTCO, U, GCP, KLAT, IO, S, NK, NP, NPE, NPAR_VEG_IRR_USE,  &
                                    HPROGRAM,HSURF,HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,YDCTL)
 !     #################################################################################
 !
@@ -26,8 +26,10 @@ SUBROUTINE PREP_HOR_ISBA_CC_FIELD (DTCO, U, GCP, KLAT, IO, S, NK, NP, NPE,  &
 !!
 !!    MODIFICATIONS
 !!    -------------
-!!      Original    05/2014
-!!      P. Marguinaud10/2014, Support for a 2-part PREP
+!!      Original      05/2014
+!!      P. Marguinaud 10/2014, Support for a 2-part PREP
+!!      A. Druel      02/2019, Adapt the code and transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !!------------------------------------------------------------------
 !
 USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
@@ -46,6 +48,7 @@ USE MODD_SURFEX_MPI, ONLY : NRANK, NPIO, NCOMM, NPROC
 !
 USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE
 USE MODD_SURF_PAR,       ONLY : XUNDEF,NUNDEF
+USE MODD_AGRI,           ONLY : NVEG_IRR
 !
 USE MODE_PREP_CTL, ONLY : PREP_CTL, PREP_CTL_INT_PART2, PREP_CTL_INT_PART4
 !
@@ -103,6 +106,7 @@ TYPE(NFOUT) :: ZF
 TYPE(ISBA_P_t), POINTER :: PK
 TYPE(ISBA_PE_t), POINTER :: PEK
 !
+INTEGER,DIMENSION(:),INTENT(IN):: NPAR_VEG_IRR_USE ! vegtype with irrigation
  CHARACTER(LEN=6)              :: YFILETYPE ! type of input file
  CHARACTER(LEN=28)             :: YFILE     ! name of file
  CHARACTER(LEN=6)              :: YFILEPGDTYPE ! type of input file
@@ -197,7 +201,7 @@ IF (YDCTL%LPART3) THEN
     ALLOCATE(ZPATCH(KLAT,INP))
     ZPATCH(:,:) = 0.
 !
-    CALL GET_PREP_INTERP(INP,IO%NPATCH,S%XVEGTYPE,S%XPATCH,ZPATCH)
+    CALL GET_PREP_INTERP(INP,IO%NPATCH,S%XVEGTYPE,S%XPATCH,ZPATCH,NPAR_VEG_IRR_USE)
   
     DO JP = 1, INP
   ! we interpolate each point the output patch is present
@@ -225,8 +229,8 @@ IF (YDCTL%LPART5) THEN
 
     IF (IO%NPATCH/=INP) THEN
 
-      ALLOCATE(ZFIELDOUTV(KLAT,INL,NVEGTYPE))
-      CALL PUT_ON_ALL_VEGTYPES(KLAT,INL,INP,NVEGTYPE,ZFIELDOUTP,ZFIELDOUTV)
+      ALLOCATE(ZFIELDOUTV(KLAT,INL,NVEGTYPE+NVEG_IRR))
+      CALL PUT_ON_ALL_VEGTYPES(KLAT,INL,INP,NVEGTYPE,NPAR_VEG_IRR_USE,ZFIELDOUTP,ZFIELDOUTV)
 !
       DEALLOCATE(ZFIELDOUTP)
 !
@@ -241,7 +245,7 @@ IF (YDCTL%LPART5) THEN
         ALLOCATE(ZW%AL(JP)%ZOUT(PK%NSIZE_P,INL))
         !
         CALL VEGTYPE_GRID_TO_PATCH_GRID(JP,IO%NPATCH,PK%XVEGTYPE_PATCH,PK%XPATCH,&
-                                        PK%NR_P,ZFIELDOUTV,ZW%AL(JP)%ZOUT)
+                                        PK%NR_P,ZFIELDOUTV,ZW%AL(JP)%ZOUT,NPAR_VEG_IRR_USE)
       ENDDO
       !
       DEALLOCATE(ZFIELDOUTV)

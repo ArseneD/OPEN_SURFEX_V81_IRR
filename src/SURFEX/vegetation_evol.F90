@@ -4,7 +4,7 @@
 !SFX_LIC for details. version 1.
 !     #########
     SUBROUTINE VEGETATION_EVOL(IO, DTI, PK, PEK, OAGRIP, PTSTEP, KMONTH, KDAY, PTIME, &
-                               PLAT, PRHOA, P_CO2, ISSK, PRESP_BIOMASS_INST, PSWDIR)  
+                               PLAT, PRHOA, P_CO2, ISSK, PRESP_BIOMASS_INST, LBIOM_REAP, PSWDIR)  
 !   ###############################################################
 !!****  *VEGETATION EVOL*
 !!
@@ -47,7 +47,9 @@
 !!      C. Delire    01/2014 : IBIS respiration for tropical evergreen
 !!      R. Seferian  05/2015 : expanding of Nitrogen dilution option to the complete formulation proposed by Yin et al. GCB 2002 
 !!Seferian & Delire  06/2015 : accouting for living woody biomass respiration (expanding work of E Joetzjer to all woody PFTs) 
-!!      B. Decharme    01/16 : Bug when vegetation veg, z0 and emis are imposed whith interactive vegetation
+!!      B. Decharme  01/2016 : Bug when vegetation veg, z0 and emis are imposed whith interactive vegetation
+!!      A. Druel     02/2019 : Streamlines the code and adapt it to be compatible with new irrigation
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.     DECLARATIONS
@@ -78,6 +80,7 @@ USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE_ECOSG, NVEGTYPE, &
                                 NVT_TRBD, NVT_TEBE, NVT_TENE,   &
                                 NVT_BOBD, NVT_BOND, NVT_SHRB,   &
                                 NVT_TRBE
+USE MODD_AGRI,           ONLY : NVEG_IRR, LIRRIGMODE, LMULTI_SEASON
 USE MODD_SURF_PAR
 !
 USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
@@ -88,9 +91,9 @@ IMPLICIT NONE
 !*      0.1    declarations of arguments
 !
 TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
-TYPE(DATA_ISBA_t), INTENT(INOUT) :: DTI
-TYPE(ISBA_P_t), INTENT(INOUT) :: PK
-TYPE(ISBA_PE_t), INTENT(INOUT) :: PEK
+TYPE(DATA_ISBA_t),    INTENT(INOUT) :: DTI
+TYPE(ISBA_P_t),       INTENT(INOUT) :: PK
+TYPE(ISBA_PE_t),      INTENT(INOUT) :: PEK
 !
 LOGICAL,              INTENT(IN)    :: OAGRIP  ! agricultural practices
 !
@@ -103,9 +106,11 @@ REAL,   DIMENSION(:), INTENT(IN)    :: PRHOA   ! air density
 !
 REAL,   DIMENSION(:), INTENT(IN)    :: P_CO2 ! CO2 concentration [ppmm]
 !
-TYPE(SSO_t), INTENT(INOUT) :: ISSK
+TYPE(SSO_t),          INTENT(INOUT) :: ISSK
 !
 REAL, DIMENSION(:,:), INTENT(INOUT) :: PRESP_BIOMASS_INST ! instantaneous respiration of biomass (kgCO2/kgair m/s)
+!
+LOGICAL,              INTENT(IN)    :: LBIOM_REAP ! .TRUE. + OAGRIP = Biomass harvested
 !
 REAL, DIMENSION(:),   INTENT(IN),   OPTIONAL :: PSWDIR    ! Global incoming shortwave radiation (W m-2)
 !
@@ -150,10 +155,13 @@ REAL                              :: ZWGHT_SOIL   ! Weight for DIF (m)
 !
 LOGICAL, DIMENSION(SIZE(PEK%XLAI,1))    :: GWOOD,GHERB
 LOGICAL, DIMENSION(SIZE(PEK%XLAI,1))    :: GMASK_AGRI
+LOGICAL, DIMENSION(SIZE(PEK%XLAI,1))    :: GINV       ! Check seed/reap inversion (T/F)
 LOGICAL                           :: GMASK
-INTEGER                           :: INI, INL, JI, JL, IDEPTH, JTYPE
+INTEGER                           :: INI, INL, JI, JL, IDEPTH, JTYPE, JTYPE2
 !
-REAL,    DIMENSION(SIZE(PK%XVEGTYPE_PATCH,1),SIZE(PK%XVEGTYPE_PATCH,2)) :: ZPARAM_TYPE
+REAL, DIMENSION(SIZE(PK%XVEGTYPE_PATCH,1)) :: ZVEG
+!
+REAL                              :: ZPARAM_TYPE
 !
 ! * Azote
 REAL,    DIMENSION(SIZE(PEK%XLAI,1)) :: ZFERT
@@ -178,9 +186,15 @@ ZTG_SOIL(:) = 0.0
 ZTG_VEG (:) = 0.0
 !
 ! Define herbaceous and woody patches
-GHERB(:) = ( PK%XVEGTYPE_PATCH(:,NVT_TEBD) + PK%XVEGTYPE_PATCH(:,NVT_TRBE) + PK%XVEGTYPE_PATCH(:,NVT_BONE)    &
-&          + PK%XVEGTYPE_PATCH(:,NVT_TRBD) + PK%XVEGTYPE_PATCH(:,NVT_TEBE) + PK%XVEGTYPE_PATCH(:,NVT_TENE)    &
-&          + PK%XVEGTYPE_PATCH(:,NVT_BOBD) + PK%XVEGTYPE_PATCH(:,NVT_BOND) + PK%XVEGTYPE_PATCH(:,NVT_SHRB)<0.5)
+ZVEG(:)=0.
+DO JTYPE = 1, SIZE(PK%XVEGTYPE_PATCH,2)
+  JTYPE2 = JTYPE
+  IF (JTYPE > NVEGTYPE) JTYPE2 = DTI%NPAR_VEG_IRR_USE( JTYPE - NVEGTYPE )
+  IF ( JTYPE2==NVT_TEBD .OR. JTYPE2==NVT_TRBE .OR. JTYPE2==NVT_BONE .OR. JTYPE2==NVT_TRBD .OR. JTYPE2==NVT_TEBE .OR. &
+       JTYPE2==NVT_TENE .OR. JTYPE2==NVT_BOBD .OR. JTYPE2==NVT_BOND .OR. JTYPE2==NVT_SHRB )                          &
+    ZVEG(:) = ZVEG(:) + PK%XVEGTYPE_PATCH(:,JTYPE)
+ENDDO
+GHERB(:) = (ZVEG(:)<0.5)
 GWOOD(:) = (.NOT.GHERB (:))
 !
 ! Mask where vegetation evolution is performed (just before solar midnight)
@@ -230,19 +244,21 @@ IF (GMASK) THEN
     ENDIF
 !
     ZPARAM(:) = 0.0
-    ZFERT (:) = 0.0
+    ZFERT (:) = 0.0   ! Oo All time = 0 ? never implemented ?
     DO JTYPE=1,SIZE(PK%XVEGTYPE_PATCH,2)
+      JTYPE2 = JTYPE
+      IF (JTYPE > NVEGTYPE) JTYPE2 = DTI%NPAR_VEG_IRR_USE( JTYPE - NVEGTYPE )
       IF (NVEGTYPE==NVEGTYPE_ECOSG) THEN
-        ZDILUDEC = XDILUDEC(ITRANSFERT_ESG(JTYPE))
+        ZDILUDEC = XDILUDEC(ITRANSFERT_ESG(JTYPE2))
       ELSE
-        ZDILUDEC = XDILUDEC(JTYPE)
+        ZDILUDEC = XDILUDEC(JTYPE2)
       ENDIF
       DO JI = 1,INI
-        ZPARAM_TYPE(JI,JTYPE) = ZDILUDEC * (ZDECIDUS + 1.1 * ZPHOTON * XPARCF * PSWDIR(JI)       &
-                              + (ZTG_VEG(JI)-XTT)/ZTEMP_VEG - 0.33 * ZFERT(JI))                         &
-                              + (1 - ZDILUDEC) * (1.1 * ZPHOTON * XPARCF * PSWDIR(JI) &
-                              + (ZTG_VEG(JI)-XTT)/ZTEMP_VEG - 0.33 * ZFERT(JI))
-        ZPARAM(JI) = ZPARAM(JI) + ZPARAM_TYPE(JI,JTYPE) * PK%XVEGTYPE_PATCH(JI,JTYPE)
+        ZPARAM_TYPE = ZDILUDEC * (ZDECIDUS + 1.1 * ZPHOTON * XPARCF * PSWDIR(JI)   &
+                    + (ZTG_VEG(JI)-XTT)/ZTEMP_VEG - 0.33 * ZFERT(JI))              &
+                    + (1 - ZDILUDEC) * (1.1 * ZPHOTON * XPARCF * PSWDIR(JI)        &
+                    + (ZTG_VEG(JI)-XTT)/ZTEMP_VEG - 0.33 * ZFERT(JI))
+        ZPARAM(JI) = ZPARAM(JI) + ZPARAM_TYPE * PK%XVEGTYPE_PATCH(JI,JTYPE)
       ENDDO 
     ENDDO  
 
@@ -254,7 +270,7 @@ IF (GMASK) THEN
     ENDWHERE
 !
   ENDIF
-!    
+!
   IF(ANY(PEK%XLAI(:)/=XUNDEF))THEN
     CALL NITRO_DECLINE(IO, PK, PEK, GWOOD, ZBSLAI_NITRO, PLAT, ZBIOMASS_LEAF)
     CALL LAIGAIN(ZBSLAI_NITRO, PEK, ZBIOMASS_LEAF)
@@ -352,34 +368,110 @@ ENDDO
 !*      3.     Agricultural practices
 !              ----------------------
 !
-IF (OAGRIP) THEN
+IF (OAGRIP .OR. (LIRRIGMODE .AND. LMULTI_SEASON) ) THEN
+  !
+  ! 3.1 Determining if there are inversions in seeding and reaping date (=winter crops) 
+  ! -----------------------------------------------------------------------------------
+  !
+  GINV(:) = .FALSE.
+  WHERE ( PEK%TSEED(:)%TDATE%MONTH /= NUNDEF .AND. PEK%TREAP(:)%TDATE%MONTH /= NUNDEF .AND.  &
+        ( PEK%TSEED(:)%TDATE%MONTH >  PEK%TREAP(:)%TDATE%MONTH .OR.                          &
+          ( PEK%TSEED(:)%TDATE%MONTH==PEK%TREAP(:)%TDATE%MONTH .AND. PEK%TSEED(:)%TDATE%DAY>PEK%TREAP(:)%TDATE%DAY ) ) )
+    GINV(:) = .TRUE.
+  END WHERE
+  !
+  !
+  ! 3.2 Define the GMASK_AGRI for winter crops and summer crops 
+  ! -----------------------------------------------------------
   !
   GMASK_AGRI(:) = .FALSE.
-  WHERE ( PEK%TSEED(:)%TDATE%MONTH /= NUNDEF .AND. ( KMONTH < PEK%TSEED(:)%TDATE%MONTH .OR. &
-         (KMONTH == PEK%TSEED(:)%TDATE%MONTH .AND. KDAY < PEK%TSEED(:)%TDATE%DAY) ) )  GMASK_AGRI(:) = .TRUE.
-  WHERE ( PEK%TREAP(:)%TDATE%MONTH /= NUNDEF .AND. ( KMONTH > PEK%TREAP(:)%TDATE%MONTH .OR. &
-         (KMONTH == PEK%TREAP(:)%TDATE%MONTH .AND. KDAY >= PEK%TREAP(:)%TDATE%DAY) ) ) GMASK_AGRI(:) = .TRUE. 
+  WHERE ( ( PEK%TSEED(:)%TDATE%MONTH /= NUNDEF .AND. PEK%TREAP(:)%TDATE%MONTH /= NUNDEF .AND.       & ! TSEED AND TREAD defines
+          ( ( (.NOT.GINV(:)) .AND.                                                                  & ! If summer crop:
+              ( ( (KMONTH == PEK%TSEED(:)%TDATE%MONTH .AND. KDAY < PEK%TSEED(:)%TDATE%DAY) .OR.     & !        - Before seeding
+              KMONTH < PEK%TSEED(:)%TDATE%MONTH ) .OR. ( KMONTH > PEK%TREAP(:)%TDATE%MONTH .OR.     & !        - OR after reaping
+              (KMONTH == PEK%TREAP(:)%TDATE%MONTH .AND. KDAY >= PEK%TREAP(:)%TDATE%DAY) ) ) )       &
+            .OR. ( (GINV(:) ) .AND.                                                                 & ! If winter crop:
+              ( ( (KMONTH == PEK%TSEED(:)%TDATE%MONTH .AND. KDAY < PEK%TSEED(:)%TDATE%DAY) .OR.     & !        - Before seeding
+              KMONTH < PEK%TSEED(:)%TDATE%MONTH ) .AND. (KMONTH > PEK%TREAP(:)%TDATE%MONTH .OR.     & !        - AND after reaping
+              (KMONTH == PEK%TREAP(:)%TDATE%MONTH .AND. KDAY >= PEK%TREAP(:)%TDATE%DAY) ) ) ) ) )   & 
+         .AND. (PEK%TSEED(:)%TDATE%MONTH /= 1  .OR. PEK%TSEED(:)%TDATE%DAY /= 1 .OR.                & ! Ajout de l'exeption si toute l'année: pas de coupe !!
+                PEK%TREAP(:)%TDATE%MONTH /= 12 .OR. PEK%TREAP(:)%TDATE%DAY /= 31) )
+    GMASK_AGRI(:) = .TRUE.
+  ENDWHERE
   !
-  WHERE (GMASK_AGRI(:))
-    PEK%XLAI(:)             = PEK%XLAIMIN(:)
-    ZBIOMASS_LEAF(:)    = PEK%XLAI(:) * ZBSLAI_NITRO(:)
-  END WHERE
-
-  WHERE (GMASK_AGRI(:))
-    PEK%XBIOMASS(:,1)       = 0.0
-    PEK%XBIOMASS(:,2)       = 0.0
-    PEK%XBIOMASS(:,3)       = 0.0
-    PEK%XRESP_BIOMASS(:,2)  = 0.0
-    PEK%XRESP_BIOMASS(:,3)  = 0.0
-  END WHERE
+  ! 3.3 Remove crops if not allowed (exept for trees)
+  ! -----------------------------------------------------------
   !
-  IF (IO%CPHOTO == 'NCB') THEN
+  IF ( OAGRIP .AND. LBIOM_REAP ) THEN
+    WHERE (GMASK_AGRI(:))
+      PEK%XLAI(:)             = PEK%XLAIMIN(:)
+      ZBIOMASS_LEAF(:)    = PEK%XLAI(:) * ZBSLAI_NITRO(:)
+    END WHERE
     !
-    WHERE (GMASK_AGRI(:)) 
-      PEK%XBIOMASS(:,4)       = 0.0
-      PEK%XBIOMASS(:,5)       = 0.0
-      PEK%XBIOMASS(:,6)       = 0.0
-      PEK%XRESP_BIOMASS(:,4)  = 0.0
+    WHERE (GMASK_AGRI(:))
+      PEK%XBIOMASS(:,1)       = 0.0
+      PEK%XBIOMASS(:,2)       = 0.0
+      PEK%XBIOMASS(:,3)       = 0.0
+      PEK%XRESP_BIOMASS(:,2)  = 0.0
+      PEK%XRESP_BIOMASS(:,3)  = 0.0
+    END WHERE
+    !
+    IF (IO%CPHOTO == 'NCB') THEN
+      WHERE (GMASK_AGRI(:)) 
+        PEK%XBIOMASS(:,4)       = 0.0
+        PEK%XBIOMASS(:,5)       = 0.0
+        PEK%XBIOMASS(:,6)       = 0.0
+        PEK%XRESP_BIOMASS(:,4)  = 0.0
+      END WHERE
+    ENDIF
+    !
+  ENDIF
+  !
+  ! 3.4 Check if there is more than one season for vegetation type and update the dates
+  ! -----------------------------------------------------------
+  !
+  IF ( LMULTI_SEASON ) THEN
+    ! Update the date only when we are outside a irrigation season and only if there is differents season in this point
+    WHERE (GMASK_AGRI(:) .AND. PEK%MULTI_TSEED(:,2)%TDATE%MONTH /= NUNDEF )
+      ! Check if we are still in the prescendent season dates for oagrip/oirrigation
+      WHERE ( ( PEK%TREAP(:)%TDATE%MONTH <   KMONTH                                          .OR. &
+               (PEK%TREAP(:)%TDATE%MONTH ==  KMONTH .AND. PEK%TREAP(:)%TDATE%DAY <= KDAY) )  .AND.& ! wrong season if after treap
+              (.NOT.GINV(:).AND. .NOT.( PEK%MULTI_TREAP(:,1)%TDATE%MONTH==PEK%TREAP(:)%TDATE%MONTH .AND. & ! IF no inversion, execpt if the current date is after the reaping date of the last season: we have to be at the first season
+                                        PEK%MULTI_TREAP(:,1)%TDATE%DAY  ==PEK%TREAP(:)%TDATE%DAY   .AND. & !
+                                 ((PEK%MULTI_TSEED(:,3)%TDATE%MONTH==NUNDEF .AND. (PEK%MULTI_TSEED(:,2)%TDATE%MONTH<KMONTH .OR.    & ! check if we are not after the last season (without inversion in this last season)
+                                   (PEK%MULTI_TSEED(:,2)%TDATE%MONTH==KMONTH .AND. PEK%MULTI_TSEED(:,2)%TDATE%DAY  <=KDAY))).OR.   &
+                                  (PEK%MULTI_TSEED(:,3)%TDATE%MONTH/=NUNDEF .AND. (PEK%MULTI_TSEED(:,3)%TDATE%MONTH<KMONTH .OR.    &
+                                   (PEK%MULTI_TSEED(:,3)%TDATE%MONTH==KMONTH .AND. PEK%MULTI_TSEED(:,3)%TDATE%DAY  <=KDAY)))))).OR.&
+              ( GINV(:)      .AND. ((PEK%MULTI_TSEED(:,1)%TDATE%MONTH >   KMONTH)                                 .OR. & ! IF inversion, wrong season if it's moreover not during the last season
+                               (PEK%MULTI_TSEED(:,1)%TDATE%MONTH ==  KMONTH .AND. PEK%MULTI_TSEED(:,1)%TDATE%DAY > KDAY)) ) )
+        ! Check in witch season we are and them update dates in concequence
+        WHERE ( GINV(:) ) ! In case of inversion and multiseason, the next season have to be the first one
+          PEK%TSEED(:)%TDATE%MONTH = PEK%MULTI_TSEED(:,1)%TDATE%MONTH
+          PEK%TSEED(:)%TDATE%DAY   = PEK%MULTI_TSEED(:,1)%TDATE%DAY
+          PEK%TREAP(:)%TDATE%MONTH = PEK%MULTI_TREAP(:,1)%TDATE%MONTH
+          PEK%TREAP(:)%TDATE%DAY   = PEK%MULTI_TREAP(:,1)%TDATE%DAY
+        ELSEWHERE ( PEK%TSEED(:)%TDATE%MONTH == PEK%MULTI_TSEED(:,1)%TDATE%MONTH .AND. &
+                    PEK%TSEED(:)%TDATE%DAY   == PEK%MULTI_TSEED(:,1)%TDATE%DAY )  ! In case that we was is the first season
+          PEK%TSEED(:)%TDATE%MONTH = PEK%MULTI_TSEED(:,2)%TDATE%MONTH
+          PEK%TSEED(:)%TDATE%DAY   = PEK%MULTI_TSEED(:,2)%TDATE%DAY
+          PEK%TREAP(:)%TDATE%MONTH = PEK%MULTI_TREAP(:,2)%TDATE%MONTH
+          PEK%TREAP(:)%TDATE%DAY   = PEK%MULTI_TREAP(:,2)%TDATE%DAY
+        ELSEWHERE ( PEK%TSEED(:)%TDATE%MONTH == PEK%MULTI_TSEED(:,2)%TDATE%MONTH .AND. &
+                    PEK%TSEED(:)%TDATE%DAY   == PEK%MULTI_TSEED(:,2)%TDATE%DAY   .AND. & 
+                    PEK%MULTI_TSEED(:,3)%TDATE%MONTH /= NUNDEF )  ! In case that we was is the second season and there is a third one
+          PEK%TSEED(:)%TDATE%MONTH = PEK%MULTI_TSEED(:,3)%TDATE%MONTH
+          PEK%TSEED(:)%TDATE%DAY   = PEK%MULTI_TSEED(:,3)%TDATE%DAY
+          PEK%TREAP(:)%TDATE%MONTH = PEK%MULTI_TREAP(:,3)%TDATE%MONTH
+          PEK%TREAP(:)%TDATE%DAY   = PEK%MULTI_TREAP(:,3)%TDATE%DAY
+        ELSEWHERE  ! In case that we was is the second season and there is not a third one
+          PEK%TSEED(:)%TDATE%MONTH = PEK%MULTI_TSEED(:,1)%TDATE%MONTH
+          PEK%TSEED(:)%TDATE%DAY   = PEK%MULTI_TSEED(:,1)%TDATE%DAY
+          PEK%TREAP(:)%TDATE%MONTH = PEK%MULTI_TREAP(:,1)%TDATE%MONTH
+          PEK%TREAP(:)%TDATE%DAY   = PEK%MULTI_TREAP(:,1)%TDATE%DAY
+        END WHERE
+        !
+      END WHERE
+      !
     END WHERE
     !
   ENDIF
@@ -394,16 +486,16 @@ IF (GMASK) THEN
   ! Evolution of vegetation fraction and roughness length due to LAI change
   IF(.NOT.DTI%LIMP_Z0) THEN
     WHERE( PEK%XVEG(:) > 0. ) &
-      PEK%XZ0 (:) = Z0V_FROM_LAI(PEK%XLAI(:),PK%XH_TREE(:),PK%XVEGTYPE_PATCH(:,:),IO%LAGRI_TO_GRASS) 
+      PEK%XZ0 (:) = Z0V_FROM_LAI(PEK%XLAI(:),PK%XH_TREE(:),PK%XVEGTYPE_PATCH(:,:),IO%LAGRI_TO_GRASS,DTI%NPAR_VEG_IRR_USE) 
   ENDIF
   IF(.NOT.DTI%LIMP_VEG) THEN
     WHERE( PEK%XVEG(:) > 0. ) &
-      PEK%XVEG(:) = VEG_FROM_LAI(PEK%XLAI(:),PK%XVEGTYPE_PATCH(:,:),IO%LAGRI_TO_GRASS)
+      PEK%XVEG(:) = VEG_FROM_LAI(PEK%XLAI(:),PK%XVEGTYPE_PATCH(:,:),IO%LAGRI_TO_GRASS,DTI%NPAR_VEG_IRR_USE)
   ENDIF
   !
   ! Evolution of radiative parameters due to vegetation fraction change
   IF(.NOT.DTI%LIMP_EMIS) THEN
-    WHERE( PEK%XVEG(:) > 0. ) PEK%XEMIS(:)= EMIS_FROM_VEG(PEK%XVEG(:),PK%XVEGTYPE_PATCH(:,:))
+    WHERE( PEK%XVEG(:) > 0. ) PEK%XEMIS(:)= EMIS_FROM_VEG(PEK%XVEG(:),PK%XVEGTYPE_PATCH(:,:),DTI%NPAR_VEG_IRR_USE)
   ENDIF
   !
   CALL ALBEDO(IO%CALBEDO, PEK )  

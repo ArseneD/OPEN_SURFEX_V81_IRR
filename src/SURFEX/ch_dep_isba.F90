@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-     SUBROUTINE CH_DEP_ISBA(KK, PK, PEK, D, DM, CHIK, PUSTAR, PTA, PPA, PTRAD, KSIZE  )  
+     SUBROUTINE CH_DEP_ISBA(KK, PK, PEK, D, DM, CHIK, PUSTAR, PTA, PPA, PTRAD, KSIZE, NPAR_VEG_IRR_USE )
 !###########################################################                      
 !!
 !!    PURPOSE
@@ -25,6 +25,7 @@
 !!      Modification  01/2004   (Tulet Masson) removes patch calculation
 !!      Modification  03/2006   (Le Moigne) pb in where test with some
 !!                            compilation options
+!!      Modification  02/2019   (A. Druel) adapt the code to be compatible with new irrigation
 !!
 !-------------------------------------------------------------------------------
 !
@@ -36,10 +37,10 @@ USE MODD_DIAG_MISC_ISBA_n, ONLY : DIAG_MISC_ISBA_t
 USE MODD_ISBA_n, ONLY : ISBA_K_t, ISBA_P_t, ISBA_PE_t
 USE MODD_CH_ISBA_n, ONLY : CH_ISBA_t
 !
-USE MODD_DATA_COVER_PAR, ONLY : NVT_NO, NVT_ROCK
+USE MODD_DATA_COVER_PAR, ONLY : NVT_NO, NVT_ROCK, NVEGTYPE
+USE MODD_AGRI,           ONLY : NVEG_IRR
 !
 USE MODD_ISBA_PAR
-USE MODD_DATA_COVER_PAR
 USE MODD_CSTS
 USE MODD_CH_ISBA,     ONLY : XRCCLAYSO2, XRCCLAYO3, XRCSANDSO2, XRCSANDO3, &
                              XRCSNOWSO2, XRCSNOWO3, XLANDREXT  
@@ -68,6 +69,8 @@ REAL, DIMENSION(:),     INTENT(IN)  :: PPA          ! surface atmospheric pressu
 REAL, DIMENSION(:),     INTENT(IN)  :: PTRAD        ! radiative temperature  (K)
 !
 INTEGER, INTENT(IN) :: KSIZE
+!
+INTEGER,DIMENSION(:),   INTENT(IN)  :: NPAR_VEG_IRR_USE ! vegtype with irrigation (OPTIONAL OK?)
 !
 !*       0.2   Declarations of local variables :
 !
@@ -118,9 +121,9 @@ REAL, DIMENSION(SIZE(PTRAD))      :: ZTCOR
 !
 REAL, DIMENSION(KSIZE) :: ZVAR1, ZVAR2, ZFACT1
 !
-REAL :: ZTYPE2_SAND, ZTYPE2_CLAY, ZTYPE2_SNOW ! Type soil 2
+REAL :: ZTYPE2_SAND, ZTYPE2_CLAY, ZTYPE2_SNOW, ZVEG_ROCK, ZVEG_NO ! Type soil 2 + frac veg
 !
-INTEGER :: JSV, JI
+INTEGER :: JSV, JI, JTYPE, JTYPE2
 !
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
@@ -402,9 +405,27 @@ DO JSV = 1, KSIZE
     !            --------------------------------------------
     !
     ! add rocks into bare soil resistance computation, when present
-    IF ( PK%XVEGTYPE_PATCH(JI,NVT_ROCK)>0. ) THEN 
-      ZBARERC(JI,JSV) = ( PK%XVEGTYPE_PATCH(JI,NVT_NO)+PK%XVEGTYPE_PATCH(JI,NVT_ROCK) ) / &
-            ( PK%XVEGTYPE_PATCH(JI,NVT_NO)/ZBARERC(JI,JSV) + PK%XVEGTYPE_PATCH(JI,NVT_ROCK)/ZROCKRC(JI,JSV) )
+    IF ( NVEG_IRR == 0 .AND. PK%XVEGTYPE_PATCH(JI,NVT_ROCK)>0.) THEN
+      ZBARERC(JI,JSV) = ( PK%XVEGTYPE_PATCH(JI,NVT_NO) + PK%XVEGTYPE_PATCH(JI,NVT_ROCK) ) / &
+            ( PK%XVEGTYPE_PATCH(JI,NVT_NO) / ZBARERC(JI,JSV) + PK%XVEGTYPE_PATCH(JI,NVT_ROCK) / ZROCKRC(JI,JSV) )
+      !
+    ELSEIF ( NVEG_IRR /= 0 ) THEN !Same but if there is NVEG_IRR
+      ZVEG_ROCK = 0.
+      ZVEG_NO = 0.
+      !
+      DO JTYPE = 1, SIZE(PK%XVEGTYPE_PATCH,2) ! = NVEG_IRR + NVEGTYPE
+        JTYPE2 = JTYPE
+        IF ( JTYPE > NVEGTYPE) JTYPE2 = NPAR_VEG_IRR_USE( JTYPE - NVEGTYPE )
+        !
+        IF ( JTYPE2 == NVT_ROCK ) THEN
+          ZVEG_ROCK = ZVEG_ROCK + PK%XVEGTYPE_PATCH(JI,JTYPE)
+        ELSEIF ( JTYPE2 == NVT_NO ) THEN
+          ZVEG_NO = ZVEG_NO + PK%XVEGTYPE_PATCH(JI,JTYPE)
+        ENDIF
+      ENDDO
+      !
+      IF ( ZVEG_ROCK > 0. ) ZBARERC(JI,JSV) = ( ZVEG_NO + ZVEG_ROCK ) / ( ZVEG_NO / ZBARERC(JI,JSV) + ZVEG_ROCK / ZROCKRC(JI,JSV) )
+      !
     ENDIF
     !
     ! computes resistance due to soil and vegetation

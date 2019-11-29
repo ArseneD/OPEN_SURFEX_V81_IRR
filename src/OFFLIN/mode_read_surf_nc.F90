@@ -33,7 +33,9 @@ MODULE MODE_READ_SURF_NC
 !!    MODIFICATIONS
 !!    -------------
 !!
-!!      original                                                     01/08/03
+!!      original         01/08/03
+!!      A.Druel           02/2019: Change length 40 to 160
+!!
 !----------------------------------------------------------------------------
 !
 INTERFACE READ_SURF0_NC
@@ -51,7 +53,7 @@ INTEGER,            INTENT(OUT) :: KRESP    ! KRESP  : return-code if a problem 
 END SUBROUTINE READ_SURFN0_NC
       SUBROUTINE READ_SURFC0_NC(HREC,HFIELD,KRESP,HCOMMENT)
  CHARACTER(LEN=*),   INTENT(IN)  :: HREC     ! name of the article to be read
- CHARACTER(LEN=40),   INTENT(OUT) :: HFIELD   ! the integer scalar to be read
+ CHARACTER(LEN=160), INTENT(OUT) :: HFIELD   ! the integer scalar to be read
 INTEGER,             INTENT(OUT) :: KRESP    ! KRESP  : return-code if a problem appears
  CHARACTER(LEN=100),  INTENT(OUT) :: HCOMMENT ! comment
 END SUBROUTINE READ_SURFC0_NC
@@ -982,14 +984,14 @@ IMPLICIT NONE
 !*      0.1   Declarations of arguments
 !
  CHARACTER(LEN=*),   INTENT(IN)  :: HREC     ! name of the article to be read
- CHARACTER(LEN=40),   INTENT(OUT) :: HFIELD   ! the integer scalar to be read
+ CHARACTER(LEN=160), INTENT(OUT) :: HFIELD   ! the integer scalar to be read
 INTEGER,             INTENT(OUT) :: KRESP    ! KRESP  : return-code if a problem appears
  CHARACTER(LEN=100),  INTENT(OUT) :: HCOMMENT ! comment
 !
 !*      0.2   Declarations of local variables
 !
  CHARACTER(LEN=100):: YFILE          ! filename
- CHARACTER(LEN=40):: YFIELD   
+ CHARACTER(LEN=160):: YFIELD   
 INTEGER :: IVAR_ID,JRET,JDIM,INDIMS
 INTEGER,DIMENSION(4) :: IRET
 REAL(KIND=JPRB) :: ZHOOK_HANDLE

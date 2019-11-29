@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########################
-      SUBROUTINE ARRANGE_COVER (DTCO, OWATER_TO_NATURE, OTOWN_TO_ROCK, &
+      SUBROUTINE ARRANGE_COVER (DTCO, OECOSG, OWATER_TO_NATURE, OTOWN_TO_ROCK, &
                                 PDATA_NATURE,PDATA_TOWN,PDATA_SEA,PDATA_WATER,PDATA_VEGTYPE, &
                                PDATA_GARDEN, OGARDEN, PDATA_BLD, PDATA_WALL_O_HOR           )
 !     #########################
@@ -39,6 +39,7 @@
 !!    Original    03/2009
 !!                04/2013 (V. Masson) Fusion of Arrange_cover & update_data_frac
 !!                        to allow distinct cover change options between submodels (_n)
+!!                02/2019 (A. Druel) TOWN_TO_ROCK with ECOSG
 !----------------------------------------------------------------------------
 !
 !*    0.     DECLARATION
@@ -55,7 +56,8 @@ USE MODD_DATA_COVER,     ONLY : XDATA_ROOT_DEPTH, XDATA_GROUND_DEPTH, XDATA_DICE
                                 XDATA_ALB_VEG_NIR, XDATA_ALB_VEG_VIS,             &
                                 XDATA_ALB_SOIL_NIR, XDATA_ALB_SOIL_VIS
 !
-USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE, JPCOVER, NROCK, NVT_ROCK
+USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE, JPCOVER, NROCK, NVT_ROCK, &
+                                NTYPE                                 ! #rustine
 !
 !
 USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
@@ -69,6 +71,7 @@ IMPLICIT NONE
 !
 TYPE(DATA_COVER_t), INTENT(INOUT) :: DTCO
 !
+LOGICAL, INTENT(IN) :: OECOSG                                         ! #rustine
 LOGICAL, INTENT(IN) :: OWATER_TO_NATURE
 LOGICAL, INTENT(IN) :: OTOWN_TO_ROCK
 REAL, DIMENSION(:), INTENT(IN)  :: PDATA_NATURE
@@ -147,7 +150,9 @@ ENDIF
 !-------------------------------------------------------------------------------
 !
 IF(OTOWN_TO_ROCK)THEN
-!        
+!
+  IF (OECOSG) DTCO%XDATA_VEGTYPE(SUM(NTYPE(1:3))+1:SUM(NTYPE(1:3))+10,NVT_ROCK)=1. ! #rustine
+  !
   DO JCOVER=1,JPCOVER
      IF(DTCO%XDATA_TOWN(JCOVER)>0.0.OR.DTCO%XDATA_GARDEN(JCOVER)>0.0)THEN
 !

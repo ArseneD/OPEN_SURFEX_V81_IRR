@@ -35,6 +35,8 @@ SUBROUTINE OL_DEFINE_DIM (UG, KSIZE_FULL, HPROGRAM, KLUOUT, KNI, &
 !!      Original    06/2010 
 !!      07/2011     add specific computation for IGN grid (B. Decharme)
 !!      09/2015     M. Lafaysse : snow layer dimension
+!!      02/2019     A. Druel    : Change KDIMS from 40 to 160
+!!
 !-------------------------------------------------------------------------------                         
 !
 USE MODD_SURF_ATM_GRID_n, ONLY : SURF_ATM_GRID_t
@@ -314,7 +316,7 @@ IF (HPROGRAM/='NOTIME ') THEN
   KDIMS     (INDIMS) = NF90_UNLIMITED
   HNAME_DIM (INDIMS) = 'time'
 ELSE
-  KDIMS     (INDIMS) = 40
+  KDIMS     (INDIMS) = 160
   HNAME_DIM (INDIMS) = 'char_len'
 ENDIF
 !

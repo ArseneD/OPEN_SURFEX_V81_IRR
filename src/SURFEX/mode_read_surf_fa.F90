@@ -35,6 +35,8 @@ MODULE MODE_READ_SURF_FA
 !!
 !!      original                                                     01/08/03
 !!      J.Escobar      10/06/2013: replace DOUBLE PRECISION by REAL to handle problem for promotion of real on IBM SP
+!!      A.Druel           02/2019: Change length 40 to 160
+!!
 !----------------------------------------------------------------------------
 !
 INTERFACE READ_SURF0_FA
@@ -659,7 +661,7 @@ IMPLICIT NONE
 !
 !
 CHARACTER(LEN=*),   INTENT(IN)  :: HREC      ! name of the article to be read
-CHARACTER(LEN=40),  INTENT(OUT) :: HFIELD    ! the integer to be read
+CHARACTER(LEN=160), INTENT(OUT) :: HFIELD    ! the integer to be read
 INTEGER,            INTENT(OUT) :: KRESP     ! KRESP  : return-code if a problem appears
 CHARACTER(LEN=100), INTENT(OUT) :: HCOMMENT  ! comment
 !
@@ -668,7 +670,7 @@ CHARACTER(LEN=100), INTENT(OUT) :: HCOMMENT  ! comment
 CHARACTER(LEN=50)       :: YCOMMENT
 CHARACTER(LEN=6)        :: YMASK
 CHARACTER(LEN=18)       :: YNAME ! Field Name
-CHARACTER,DIMENSION(40) :: YFIELD
+CHARACTER,DIMENSION(160) :: YFIELD
 LOGICAL                 :: GV8, GFOUND
 !
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
@@ -690,9 +692,9 @@ ELSE
   YNAME=TRIM(YMASK)//TRIM(HREC)
 ENDIF
 !
-CALL FALIT_C(KRESP,NUNIT_FA,YNAME,40,YFIELD)
+CALL FALIT_C(KRESP,NUNIT_FA,YNAME,160,YFIELD)
 IF (KRESP/=0) CALL ERROR_READ_SURF_FA(HREC,KRESP)
-WRITE(HFIELD,'(40A1)') YFIELD(:)
+WRITE(HFIELD,'(160A1)') YFIELD(:)
 !
 YCOMMENT = YNAME
 HCOMMENT = YCOMMENT

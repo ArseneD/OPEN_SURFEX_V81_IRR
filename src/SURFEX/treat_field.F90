@@ -44,6 +44,8 @@
 !!    06/2009     (B. Decharme)  call Topographic index statistics calculation
 !!    09/2010     (E. Kourzeneva) call reading of the lake database
 !!    03/2012     (M. Lafaysse) NETCDF
+!!    02/2019     (A. Druel) Add MA1 possibility (to not take into account the zeros) and streamlines MAJ
+!!
 !----------------------------------------------------------------------------
 !
 !*    0.     DECLARATION
@@ -149,7 +151,7 @@ IF (HFILETYPE=='DIRTYP') GMULTITYPE = .TRUE.
 SELECT CASE (HFILETYPE)
 
   CASE ('DIRECT','DIRTYP')
-    IF(UG%G%CGRID=="GAUSS     " .OR. UG%G%CGRID=="IGN       " .OR. UG%G%CGRID=="LONLAT REG")THEN
+    IF(UG%G%CGRID=="GAUSS     " .OR. UG%G%CGRID=="IGN       " .OR. UG%G%CGRID=="LONLAT REG") THEN
       CALL READ_DIRECT_GAUSS(UG, U, USS, &
                              HPROGRAM,HSCHEME,HSUBROUTINE,HFILENAME,HFIELD,GMULTITYPE)
     ELSE
@@ -343,7 +345,7 @@ SELECT CASE (HSUBROUTINE)
     ENDIF
     !
     !XSUMVAL needs to contain the numbers of times each cover is encountered
-    !for the current task 
+    !for the current task
     ALLOCATE(XSUMVAL(U%NSIZE_FULL,COUNT(U%LCOVER)))
     XSUMVAL(:,:) = 0.
     !
@@ -472,7 +474,7 @@ SELECT CASE (HSUBROUTINE)
     !
     !
   CASE ('A_MESH')
-   IF (CATYPE/='MAJ') THEN
+   IF (CATYPE/='MAJ' .AND. CATYPE/='MA1') THEN
 
     ALLOCATE(XSUMVAL(U%NSIZE_FULL,SIZE(XALL,2)))
     !most simple case
@@ -492,8 +494,8 @@ SELECT CASE (HSUBROUTINE)
    ELSE
 
      ALLOCATE(XSUMVAL(U%NSIZE_FULL,SIZE(NSIZE,2)))
-     IF (HFILETYPE=='DIRECT' .AND. NPROC>1) THEN
-       CALL ABOR1_SFX("TREAT_FIELD: MAJ is not possible with DIRECT filetype and NPROC>1")
+     IF ( (HFILETYPE=='DIRECT' .OR. HFILETYPE=='DIRTYP') .AND. NPROC>1) THEN ! bug fix
+       CALL ABOR1_SFX("TREAT_FIELD: MAJ or MA1 are not possible with DIRECT or DIRTYP filetype and NPROC>1")
      ELSE
        ALLOCATE(IVALNBR(U%NSIZE_FULL,SIZE(NVALNBR,2)),IVALCOUNT(U%NSIZE_FULL,JPVALMAX,SIZE(NVALNBR,2)),&
                 ZVALLIST(U%NSIZE_FULL,JPVALMAX,SIZE(NVALNBR,2)))
@@ -513,14 +515,19 @@ SELECT CASE (HSUBROUTINE)
              !* determines the index of the value which has been the most encountered
              !  in the grid mesh
              IMAX=0
+             IVAL = 0
              DO JL=1,IVALNBR(JI,JT)
-               IF (IVALCOUNT(JI,JL,JT)>IMAX) THEN
+               IF (IVALCOUNT(JI,JL,JT)>IMAX .AND. (CATYPE=='MAJ' .OR. ZVALLIST(JI,JL,JT)/=0.  ) ) THEN
                  IMAX = IVALCOUNT(JI,JL,JT)
                  IVAL = JL
                END IF
              END DO
-             !* sets this value to the PGD field
-             XSUMVAL(JI,JT)=ZVALLIST(JI,IVAL,JT)
+             !* sets this value to the PGD fielid
+             IF ( IVAL /= 0 ) THEN
+               XSUMVAL(JI,JT)=ZVALLIST(JI,IVAL,JT)
+             ELSE!IF (CATYPE=='MAJ') THEN
+               XSUMVAL(JI,JT)=0.     !! When there is no values, put 0. That mean it's normal to have 0 values with 'MA1' !!!!
+             ENDIF
          END DO
        ENDDO
        DEALLOCATE(IVALNBR,IVALCOUNT,ZVALLIST)

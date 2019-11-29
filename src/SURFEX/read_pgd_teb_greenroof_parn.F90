@@ -55,9 +55,6 @@ USE MODD_DATA_COVER_PAR,       ONLY : NVEGTYPE, NVT_GRAS, NVT_TROG
 USE MODD_PREP_TEB_GREENROOF,   ONLY : NGRID_LEVEL, XGRID_SOIL
 !
 USE MODI_READ_SURF
-USE MODI_VEG_FROM_LAI
-USE MODI_Z0V_FROM_LAI
-USE MODI_EMIS_FROM_VEG
 !
 USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
 USE PARKIND1  ,ONLY : JPRB
@@ -79,8 +76,8 @@ INTEGER, INTENT(IN) :: KDIM
 !              -------------------------------
 !
 INTEGER                               :: IRESP          ! IRESP  : return-code if a problem appears
- CHARACTER(LEN=12)                     :: YRECFM         ! Name of the article to be read
- CHARACTER(LEN=100)                    :: YCOMMENT       ! Comment string
+ CHARACTER(LEN=12)                    :: YRECFM         ! Name of the article to be read
+ CHARACTER(LEN=100)                   :: YCOMMENT       ! Comment string
 INTEGER                               :: JI             ! loop index
 INTEGER                               :: JTIME          ! loop index
 INTEGER                               :: JLAYER         ! loop index

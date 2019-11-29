@@ -3,11 +3,11 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !#############################################################
-SUBROUTINE COMPUTE_ISBA_PARAMETERS (DTCO, OREAD_BUDGETC, UG, U, &
+SUBROUTINE COMPUTE_ISBA_PARAMETERS (DTCO, OREAD_BUDGETC, UG, U,                &
                                     IO, DTI, SB, S, IG, K, NK, NIG, NP, NPE,   &
                                     NAG, NISS, ISS, NCHI, CHI, ID, GB, NGB,    &
                                     NDST, SLT, SV, HPROGRAM,HINIT,OLAND_USE,   &
-                                    KI,KSV,KSW,HSV,PCO2,PRHOA,                 &
+                                    KI,KMONTH,KDAY,KSV,KSW,HSV,PCO2,PRHOA,     &
                                     PZENITH,PSW_BANDS,PDIR_ALB,PSCA_ALB,       &
                                     PEMIS,PTSRAD,PTSURF, HTEST             )  
 !#############################################################
@@ -59,6 +59,7 @@ SUBROUTINE COMPUTE_ISBA_PARAMETERS (DTCO, OREAD_BUDGETC, UG, U, &
 !!      P. Samuelsson  02/14 : MEB
 !!      B. Decharme    01/16 : Bug when vegetation veg, z0 and emis are imposed whith interactive vegetation
 !!      B. Decharme   10/2016  bug surface/groundwater coupling 
+!!      A. Druel      02/2019  Deep change to accept patch duplication (fo irrigation or agricultural pratices), mainly for ECOCLIMAP-SG
 !!
 !-------------------------------------------------------------------------------
 !
@@ -94,8 +95,7 @@ USE MODD_DUMMY_EXP_PROFILE,ONLY : XC_DEPTH_RATIO
 USE MODD_ASSIM, ONLY : CASSIM_ISBA, LASSIM
 !
 USE MODD_DEEPSOIL,       ONLY : LPHYSDOMC, LDEEPSOIL, XTDEEP_CLI, XGAMMAT_CLI
-USE MODD_AGRI,           ONLY : LAGRIP, XTHRESHOLD
-!
+USE MODD_AGRI,           ONLY : LAGRIP, LIRRIGMODE, NVEG_IRR, NVEG_IRR_DEFAULT, NVEG_IRR_USE_DEFAULT
 !
 USE MODD_SGH_PAR,        ONLY : NDIMTAB, XICE_DEPH_MAX, XF_DECAY
 !
@@ -157,38 +157,40 @@ IMPLICIT NONE
 !*       0.1   Declarations of arguments
 !              -------------------------
 !
-TYPE(DATA_COVER_t), INTENT(INOUT) :: DTCO
-LOGICAL, INTENT(IN) :: OREAD_BUDGETC
+TYPE(DATA_COVER_t),    INTENT(INOUT) :: DTCO
+LOGICAL,               INTENT(IN)    :: OREAD_BUDGETC
 TYPE(SURF_ATM_GRID_t), INTENT(INOUT) :: UG
-TYPE(SURF_ATM_t), INTENT(INOUT) :: U
+TYPE(SURF_ATM_t),      INTENT(INOUT) :: U
 !
-TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
-TYPE(DATA_ISBA_t), INTENT(INOUT) :: DTI
-TYPE(CANOPY_t), INTENT(INOUT) :: SB
-TYPE(ISBA_S_t), INTENT(INOUT) :: S
-TYPE(GRID_t), INTENT(INOUT) :: IG
-TYPE(ISBA_K_t), INTENT(INOUT) :: K
-TYPE(ISBA_NK_t), INTENT(INOUT) :: NK
-TYPE(GRID_NP_t), INTENT(INOUT) :: NIG
-TYPE(ISBA_NP_t), INTENT(INOUT) :: NP
-TYPE(ISBA_NPE_t), INTENT(INOUT) :: NPE
-TYPE(AGRI_NP_t), INTENT(INOUT) :: NAG
-TYPE(SSO_NP_t), INTENT(INOUT) :: NISS
-TYPE(SSO_t), INTENT(INOUT) :: ISS
-TYPE(CH_ISBA_NP_t), INTENT(INOUT) :: NCHI
-TYPE(CH_ISBA_t), INTENT(INOUT) :: CHI
-TYPE(ISBA_DIAG_t), INTENT(INOUT) :: ID
-TYPE(GR_BIOG_t), INTENT(INOUT) :: GB
-TYPE(GR_BIOG_NP_t), INTENT(INOUT) :: NGB
+TYPE(ISBA_OPTIONS_t),  INTENT(INOUT) :: IO
+TYPE(DATA_ISBA_t),     INTENT(INOUT) :: DTI
+TYPE(CANOPY_t),        INTENT(INOUT) :: SB
+TYPE(ISBA_S_t),        INTENT(INOUT) :: S
+TYPE(GRID_t),          INTENT(INOUT) :: IG
+TYPE(ISBA_K_t),        INTENT(INOUT) :: K
+TYPE(ISBA_NK_t),       INTENT(INOUT) :: NK
+TYPE(GRID_NP_t),       INTENT(INOUT) :: NIG
+TYPE(ISBA_NP_t),       INTENT(INOUT) :: NP
+TYPE(ISBA_NPE_t),      INTENT(INOUT) :: NPE
+TYPE(AGRI_NP_t),       INTENT(INOUT) :: NAG
+TYPE(SSO_NP_t),        INTENT(INOUT) :: NISS
+TYPE(SSO_t),           INTENT(INOUT) :: ISS
+TYPE(CH_ISBA_NP_t),    INTENT(INOUT) :: NCHI
+TYPE(CH_ISBA_t),       INTENT(INOUT) :: CHI
+TYPE(ISBA_DIAG_t),     INTENT(INOUT) :: ID
+TYPE(GR_BIOG_t),       INTENT(INOUT) :: GB
+TYPE(GR_BIOG_NP_t),    INTENT(INOUT) :: NGB
 !
-TYPE(DST_NP_t), INTENT(INOUT) :: NDST
-TYPE(SLT_t), INTENT(INOUT) :: SLT
-TYPE(SV_t), INTENT(INOUT) :: SV
+TYPE(DST_NP_t),        INTENT(INOUT) :: NDST
+TYPE(SLT_t),           INTENT(INOUT) :: SLT
+TYPE(SV_t),            INTENT(INOUT) :: SV
 !
  CHARACTER(LEN=6),                INTENT(IN)  :: HPROGRAM  ! program calling surf. schemes
  CHARACTER(LEN=3),                INTENT(IN)  :: HINIT     ! choice of fields to initialize
 LOGICAL,                          INTENT(IN)  :: OLAND_USE !
 INTEGER,                          INTENT(IN)  :: KI        ! number of points
+INTEGER,                          INTENT(IN)  :: KMONTH    ! Month
+INTEGER,                          INTENT(IN)  :: KDAY      ! Day
 INTEGER,                          INTENT(IN)  :: KSV       ! number of scalars
 INTEGER,                          INTENT(IN)  :: KSW       ! number of short-wave spectral bands
  CHARACTER(LEN=6), DIMENSION(KSV),INTENT(IN)  :: HSV       ! name of all scalar variables
@@ -208,13 +210,13 @@ REAL,             DIMENSION(KI),  INTENT(OUT) :: PTSURF    ! surface effective t
 !*       0.2   Declarations of local variables
 !              -------------------------------
 !
-TYPE(GRID_t), POINTER :: GK
-TYPE(ISBA_P_t), POINTER :: PK
-TYPE(ISBA_K_t), POINTER :: KK
+TYPE(GRID_t),    POINTER :: GK
+TYPE(ISBA_P_t),  POINTER :: PK
+TYPE(ISBA_K_t),  POINTER :: KK
 TYPE(ISBA_PE_t), POINTER :: PEK
-TYPE(AGRI_t), POINTER :: AGK
-TYPE(SSO_t), POINTER :: ISSK
-TYPE(DST_t), POINTER :: DSTK
+TYPE(AGRI_t),    POINTER :: AGK
+TYPE(SSO_t),     POINTER :: ISSK
+TYPE(DST_t),     POINTER :: DSTK
 !
 REAL, DIMENSION(U%NDIM_FULL)   :: ZF_PARAM, ZC_DEPTH_RATIO
 !
@@ -222,20 +224,20 @@ REAL, DIMENSION(KI)     :: ZTSRAD_NAT !radiative temperature
 REAL, DIMENSION(KI)     :: ZTSURF_NAT !effective temperature
 REAL, DIMENSION(KI)     :: ZM
 !
-REAL, DIMENSION(KI)  :: ZWG1 ! work array for surface water content
+REAL, DIMENSION(KI)            :: ZWG1 ! work array for surface water content
 REAL, DIMENSION(KI,IO%NPATCH)  :: ZTG1 ! work array for surface temperature
 REAL, DIMENSION(KI,IO%NPATCH)  :: ZF
 !
 REAL, DIMENSION(:,:), ALLOCATABLE :: ZWORK
 REAL, DIMENSION(:,:), ALLOCATABLE :: ZDG_SOIL, ZDG_SOIL_P
-REAL, DIMENSION(:), ALLOCATABLE :: ZSUM_PATCH
+REAL, DIMENSION(:), ALLOCATABLE   :: ZSUM_PATCH
 !
-INTEGER :: ICH     ! unit of input chemistry file
+INTEGER           :: ICH     ! unit of input chemistry file
 INTEGER           :: JI, JL     ! loop increment
-INTEGER           :: ILUOUT   ! unit of output listing file
-INTEGER           :: IRESP   ! return code
+INTEGER           :: ILUOUT     ! unit of output listing file
+INTEGER           :: IRESP      ! return code
 INTEGER           :: IDECADE, IDECADE2  ! decade of simulation
-INTEGER           :: JP  ! loop counter on tiles
+INTEGER           :: JP         ! loop counter on tiles
 INTEGER           :: ISIZE_LMEB_PATCH  ! Number of patches with MEB=true
 !
 LOGICAL :: GDIM, GCAS1, GCAS2, GCAS3 
@@ -245,6 +247,7 @@ INTEGER :: JVEG, IVERSION, IBUGFIX, IMASK, JMAXLOC
  CHARACTER(LEN=12) :: YRECFM
 !
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
+!
 !
 !-------------------------------------------------------------------------------
 !
@@ -256,6 +259,37 @@ IF (LHOOK) CALL DR_HOOK('COMPUTE_ISBA_PARAMETERS',0,ZHOOK_HANDLE)
 IF (HTEST/='OK') THEN
   CALL ABOR1_SFX('COMPUTE_ISBA_PARAMETERS: FATAL ERROR DURING ARGUMENT TRANSFER')
 END IF
+!
+!----------------------------------------------------------------------------------
+!----------------------------------------------------------------------------------
+!
+!    PART 2 : Things depending only on options and / or needed first
+!    --------------------------------------------------------------
+
+!*       Physiographic data fields from land cover:
+!         -----------------------------------------
+!
+IF (S%TTIME%TDATE%MONTH /= NUNDEF) THEN
+  IDECADE = 3 * ( S%TTIME%TDATE%MONTH - 1 ) + MIN(S%TTIME%TDATE%DAY-1,29) / 10 + 1
+ELSE
+  IDECADE = 1
+END IF
+!
+IDECADE2 = IDECADE
+!
+! concern DATA_ISBA, so no dependence on patches
+ CALL INIT_ISBA_MIXPAR(DTCO, DTI, IG%NDIM, IO, IDECADE, IDECADE2, S%XCOVER, S%LCOVER, 'NAT', U%LECOSG)
+!
+ISIZE_LMEB_PATCH=COUNT(IO%LMEB_PATCH(:))
+IF (ISIZE_LMEB_PATCH>0)  THEN
+  CALL FIX_MEB_VEG(DTI, IG%NDIM, IO%LMEB_PATCH, IO%NPATCH)
+ENDIF
+!
+!
+!*       Soil carbon
+!        -----------                        
+!
+IF (HINIT == 'ALL' .AND. IO%CRESPSL=='CNT' .AND. IO%CPHOTO == 'NCB') CALL CARBON_INIT
 !
 !----------------------------------------------------------------------------------
 !----------------------------------------------------------------------------------
@@ -277,10 +311,79 @@ ELSE
   END DO
 ENDIF
 !
+! Take care about irrigation fraction if ECOSG and IRRIGATION
+ALLOCATE(S%XVEGTYPE2(KI,NVEGTYPE+NVEG_IRR))
+S%XVEGTYPE2(:,:) = 0.
+IF (DTI%LDATA_MIXPAR) THEN                                                                 ! Probably sufficient case.  
+  ALLOCATE(DTI%XPAR_VEGTYPE2(SIZE(DTI%XPAR_VEGTYPE,1),SIZE(DTI%XPAR_VEGTYPE,2)+NVEG_IRR))  ! Because if .NOT.(LIRRIGMODE .OR. LAGRIP),
+  DTI%XPAR_VEGTYPE2(:,:) = 0.                                                              ! DTI%LDATA_MIXPAR automaticaly = .TRUE. ?
+ELSE
+  ALLOCATE(DTI%XPAR_VEGTYPE2(1,1))
+ENDIF
+!
+IF ( U%LECOSG .AND. ( LIRRIGMODE .OR. LAGRIP ) ) THEN
+  !
+  IF ( NVEG_IRR == 0 ) CALL ABOR1_SFX('COMPUTE_ISBA_PARAMETERS - WITH LECOSG AND (LIRRIGMODE OR LAGRIP), NVEG_IRR HAVE TO BE >0')
+  !
+  IF ( NVEG_IRR /= SIZE(DTI%NPAR_VEG_IRR_USE)) &
+          CALL ABOR1_SFX('PCOMPUTE_ISBA_PARAMETER: WHEN LIRRIGMODEorLAGRIP+LECOSG, NVEG_IRR AND NPAR_VEG_IRR_USE HAVE TO BE EQUAL')
+  !
+  ! IF ECOSG and IRRIGATION, compute fraction of non irrigated vegtype + irrigated vegtype
+  DO JVEG=1,NVEGTYPE+NVEG_IRR
+    IF ( JVEG <= NVEGTYPE ) THEN
+      IF ( ANY(DTI%NPAR_VEG_IRR_USE(:)==JVEG ) ) THEN
+        WHERE ( DTI%XPAR_IRRIGFRAC(:,JVEG) /= XUNDEF .AND. DTI%XPAR_IRRIGFRAC(:,JVEG) /= 0. )
+          S%XVEGTYPE2(:,JVEG) = S%XVEGTYPE(:,JVEG) * (1 - DTI%XPAR_IRRIGFRAC(:,JVEG) )
+        ELSEWHERE
+          S%XVEGTYPE2(:,JVEG) = S%XVEGTYPE(:,JVEG)
+        ENDWHERE
+        IF (DTI%LDATA_MIXPAR) THEN
+          WHERE ( DTI%XPAR_IRRIGFRAC(:,JVEG) /= XUNDEF .AND. DTI%XPAR_IRRIGFRAC(:,JVEG) /= 0. )
+            DTI%XPAR_VEGTYPE2(:,JVEG) = DTI%XPAR_VEGTYPE(:,JVEG) * (1 - DTI%XPAR_IRRIGFRAC(:,JVEG) )
+          ELSEWHERE
+            DTI%XPAR_VEGTYPE2(:,JVEG) = DTI%XPAR_VEGTYPE(:,JVEG)
+          ENDWHERE
+        ENDIF
+      ELSE
+        S%XVEGTYPE2(:,JVEG) = S%XVEGTYPE(:,JVEG)
+        IF ( DTI%LDATA_MIXPAR ) DTI%XPAR_VEGTYPE2(:,JVEG) = DTI%XPAR_VEGTYPE(:,JVEG)
+      ENDIF
+    ELSE
+      WHERE ( DTI%XPAR_IRRIGFRAC(:,DTI%NPAR_VEG_IRR_USE(JVEG-NVEGTYPE)) /= XUNDEF .AND.      &
+              DTI%XPAR_IRRIGFRAC(:,DTI%NPAR_VEG_IRR_USE(JVEG-NVEGTYPE)) /= 0. )
+        S%XVEGTYPE2(:,JVEG) = S%XVEGTYPE(:,DTI%NPAR_VEG_IRR_USE(JVEG-NVEGTYPE))              & 
+                              * DTI%XPAR_IRRIGFRAC(:,DTI%NPAR_VEG_IRR_USE(JVEG-NVEGTYPE))
+      ELSEWHERE
+        S%XVEGTYPE2(:,JVEG) = 0.
+      ENDWHERE
+      IF (DTI%LDATA_MIXPAR) THEN
+        WHERE ( DTI%XPAR_IRRIGFRAC(:,DTI%NPAR_VEG_IRR_USE(JVEG-NVEGTYPE)) /= XUNDEF .AND.      &
+                DTI%XPAR_IRRIGFRAC(:,DTI%NPAR_VEG_IRR_USE(JVEG-NVEGTYPE)) /= 0. )
+          DTI%XPAR_VEGTYPE2(:,JVEG) = DTI%XPAR_VEGTYPE(:,DTI%NPAR_VEG_IRR_USE(JVEG-NVEGTYPE))  &
+                              * DTI%XPAR_IRRIGFRAC(:,DTI%NPAR_VEG_IRR_USE(JVEG-NVEGTYPE))
+        ELSEWHERE
+          DTI%XPAR_VEGTYPE2(:,JVEG) = 0.
+        ENDWHERE
+      ENDIF
+    ENDIF
+  ENDDO
+  !
+ELSE
+  !
+  IF ( NVEG_IRR /= 0 ) CALL ABOR1_SFX('COMPUTE_ISBA_PARAMETERS - WITHOUT LECOSG AND (LIRRIGMODE OR LAGRIP), NVEG_IRR HAVE TO BE =0')
+  !
+  S%XVEGTYPE2(:,:) = S%XVEGTYPE(:,:)
+  IF (DTI%LDATA_MIXPAR) DTI%XPAR_VEGTYPE2(:,:) = DTI%XPAR_VEGTYPE(:,:)
+  !
+ENDIF
+!
+!
 ! patches come from vegtypes
-ALLOCATE(S%XPATCH(KI,IO%NPATCH))
-ALLOCATE(S%XVEGTYPE_PATCH(KI,NVEGTYPE,IO%NPATCH))
- CALL SURF_PATCH(IO%NPATCH,S%XVEGTYPE,S%XPATCH,S%XVEGTYPE_PATCH)
+!
+ALLOCATE(S%XPATCH(KI, IO%NPATCH))
+ALLOCATE(S%XVEGTYPE_PATCH(KI, NVEGTYPE+NVEG_IRR, IO%NPATCH))
+CALL SURF_PATCH(IO%NPATCH,S%XVEGTYPE2,DTI%NPAR_VEG_IRR_USE,S%XPATCH,S%XVEGTYPE_PATCH)
+!
 !
 ! removing little fractions of patches must be done of the XPATCH with dimension
 ! "PATCH"
@@ -302,36 +405,6 @@ IF (IO%XRM_PATCH/=0.) THEN
   !
 ENDIF
 !
-!----------------------------------------------------------------------------------
-!----------------------------------------------------------------------------------
-!
-!    PART 2 : Things depending only on options and / or needed first
-!    --------------------------------------------------------------
-
-!*       Physiographic data fields from land cover:
-!         -----------------------------------------
-!
-IF (S%TTIME%TDATE%MONTH /= NUNDEF) THEN
-  IDECADE = 3 * ( S%TTIME%TDATE%MONTH - 1 ) + MIN(S%TTIME%TDATE%DAY-1,29) / 10 + 1
-ELSE
-  IDECADE = 1
-END IF
-!
-IDECADE2 = IDECADE
-!
-! concern DATA_ISBA, so no dependence on patches
- CALL INIT_ISBA_MIXPAR(DTCO, DTI, IG%NDIM, IO, IDECADE, IDECADE2, S%XCOVER, S%LCOVER, 'NAT')
-!
-ISIZE_LMEB_PATCH=COUNT(IO%LMEB_PATCH(:))
-IF (ISIZE_LMEB_PATCH>0)  THEN
-  CALL FIX_MEB_VEG(DTI, IG%NDIM, IO%LMEB_PATCH, IO%NPATCH)
-ENDIF
-!
-!
-!*       Soil carbon
-!        -----------                        
-!
-IF (HINIT == 'ALL' .AND. IO%CRESPSL=='CNT' .AND. IO%CPHOTO == 'NCB') CALL CARBON_INIT
 !
 !----------------------------------------------------------------------------------
 !----------------------------------------------------------------------------------
@@ -348,22 +421,21 @@ DO JP = 1, IO%NPATCH
   AGK => NAG%AL(JP)
   ISSK => NISS%AL(JP)
   !
-  ! dimension of the patch 
+  ! dimension of the patch
   PK%NSIZE_P = COUNT(S%XPATCH(:,JP) > 0.0)
   !
   ! mask of the patch in tile nature
   ALLOCATE(PK%NR_P    (PK%NSIZE_P))
-  CALL GET_1D_MASK(PK%NSIZE_P, KI, S%XPATCH(:,JP), PK%NR_P) 
+  CALL GET_1D_MASK(PK%NSIZE_P, KI, S%XPATCH(:,JP), PK%NR_P)
   !
   ! the array of vegtypes, patches and vegtypes by patches reduced on this patches
   ALLOCATE(KK%XVEGTYPE(PK%NSIZE_P,NVEGTYPE))
-  CALL PACK_SAME_RANK(PK%NR_P,S%XVEGTYPE,KK%XVEGTYPE)
+  CALL PACK_SAME_RANK(PK%NR_P,S%XVEGTYPE,KK%XVEGTYPE) !#metoo
   !
   ALLOCATE(PK%XPATCH(PK%NSIZE_P))
-  ALLOCATE(PK%XVEGTYPE_PATCH (PK%NSIZE_P,NVEGTYPE))
+  ALLOCATE(PK%XVEGTYPE_PATCH (PK%NSIZE_P,NVEGTYPE+NVEG_IRR))
   CALL PACK_SAME_RANK(PK%NR_P,S%XPATCH(:,JP),PK%XPATCH)
   CALL PACK_SAME_RANK(PK%NR_P,S%XVEGTYPE_PATCH(:,:,JP),PK%XVEGTYPE_PATCH)
-  !
   !
   ! soon needed packed fields
   !
@@ -404,20 +476,20 @@ DO JP = 1, IO%NPATCH
   !*       2.5    Physiographic fields
   !               --------------------
   !
-  CALL ALLOCATE_PHYSIO(IO, KK, PK, PEK, NVEGTYPE  )
+  CALL ALLOCATE_PHYSIO(IO, KK, PK, PEK, NVEGTYPE, U%LECOSG)
   !
-  CALL CONVERT_PATCH_ISBA(DTCO, DTI, IO, IDECADE, IDECADE2, S%XCOVER, S%LCOVER, &
-                          LAGRIP, 'NAT', JP, KK, PK, PEK, &
-                          .TRUE., .TRUE., .TRUE., .TRUE., .FALSE., .FALSE., &
+  CALL CONVERT_PATCH_ISBA(DTCO, DTI, IO, KMONTH, KDAY, IDECADE, IDECADE2, S%XCOVER, S%LCOVER, &
+                          LAGRIP, U%LECOSG, LIRRIGMODE, 'NAT', JP, KK, PK, PEK,               &
+                          .TRUE., .TRUE., .TRUE., .TRUE., .FALSE., .FALSE.,                   &
                           PSOILGRID=IO%XSOILGRID, PPERM=KK%XPERM  )
   !
   !-------------------------------------------------------------------------------
   !
   ! in init_veg_pgd_n, things needed also by garden and greenroof
-  CALL INIT_VEG_PGD_n(ISSK, DTI, IO, S, K, KK, PK, PEK, AGK, KI,  &
+  CALL INIT_VEG_PGD_n(ISSK, DTI, IO, S, K, KK, PK, PEK, AGK, KI,                   &
                       HPROGRAM, 'NATURE', ILUOUT, PK%NSIZE_P, S%TTIME%TDATE%MONTH, &
-                      LDEEPSOIL, LPHYSDOMC, XTDEEP_CLI, XGAMMAT_CLI,   & 
-                      LAGRIP, XTHRESHOLD, HINIT, PCO2, PRHOA        )
+                      LDEEPSOIL, LPHYSDOMC, XTDEEP_CLI, XGAMMAT_CLI,               & 
+                      LIRRIGMODE, HINIT, PCO2, PRHOA)
   !
   !-------------------------------------------------------------------------------
   !
@@ -498,7 +570,8 @@ IF (KSV /= 0) THEN
     ! contains explicitely modules from ISBAn. It should be cleaned in a future
     ! version.
     CALL OPEN_NAMELIST(HPROGRAM, ICH, HFILE=CHI%CCHEM_SURF_FILE)
-    CALL CH_INIT_DEP_ISBA_n(CHI, NCHI, NP, DTCO, IO%NPATCH, S%LCOVER, S%XCOVER, ICH, ILUOUT, KI)
+    CALL CH_INIT_DEP_ISBA_n(CHI, NCHI, NP, DTCO, IO%NPATCH, S%LCOVER, S%XCOVER, ICH, ILUOUT, KI, &
+           DTI%XPAR_IRRIGFRAC, DTI%NPAR_VEG_IRR_USE)
     CALL CLOSE_NAMELIST(HPROGRAM, ICH)
   END IF
   !
@@ -902,7 +975,7 @@ CALL INIT_IO_SURF_n(DTCO, U, HPROGRAM,'NATURE','ISBA  ','READ ')
 !*      10.     Prognostic and semi-prognostic fields
 !               -------------------------------------
 !
- CALL READ_ISBA_n(DTCO, IO, S, NP, NPE, K%XCLAY, U, HPROGRAM)
+ CALL READ_ISBA_n(DTCO, IO, S, NP, NPE, NAG, K%XCLAY, U, HPROGRAM)
 !
 IF (HINIT/='ALL') THEN
   CALL END_IO_SURF_n(HPROGRAM)
@@ -986,9 +1059,9 @@ DO JP=1,IO%NPATCH
   ZWG1(1:PK%NSIZE_P)    = PEK%XWG(:,1)
   ZTG1(1:PK%NSIZE_P,JP) = PEK%XTG(:,1)
   !
-  CALL CONVERT_PATCH_ISBA(DTCO, DTI, IO, IDECADE, IDECADE2, S%XCOVER, S%LCOVER,&
-                          LAGRIP, 'NAT', JP, KK, PK, PEK, &
-                          .FALSE., .FALSE., .FALSE., .FALSE., .TRUE., .FALSE., &
+  CALL CONVERT_PATCH_ISBA(DTCO, DTI, IO, KMONTH, KDAY, IDECADE, IDECADE2, S%XCOVER, S%LCOVER, &
+                          LAGRIP, U%LECOSG, LIRRIGMODE, 'NAT', JP, KK, PK, PEK,               &
+                          .FALSE., .FALSE., .FALSE., .FALSE., .TRUE., .FALSE.,                &
                           PWG1=ZWG1(1:PK%NSIZE_P), PWSAT=KK%XWSAT)
   !
 ENDDO
@@ -1048,8 +1121,8 @@ ENDIF
 ALLOCATE(S%XEMIS_NAT   (KI))
 S%XEMIS_NAT (:) = XUNDEF
 !
- CALL AVERAGED_ALBEDO_EMIS_ISBA(IO, S, NK, NP, NPE,                           &
-                                PZENITH, ZTG1, PSW_BANDS, PDIR_ALB, PSCA_ALB, &
+ CALL AVERAGED_ALBEDO_EMIS_ISBA(IO, S, NK, NP, NPE,                                                 &
+                                PZENITH, ZTG1, PSW_BANDS, DTI%NPAR_VEG_IRR_USE, PDIR_ALB, PSCA_ALB, &
                                 S%XEMIS_NAT, ZTSRAD_NAT, ZTSURF_NAT        )  
 !
 PEMIS  = S%XEMIS_NAT

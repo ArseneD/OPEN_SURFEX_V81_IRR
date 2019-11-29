@@ -40,27 +40,30 @@
 !!      B. Decharme  07/2012 : files of data for permafrost area and for SOC top and sub soil
 !!                   11/2013 : same for groundwater distribution
 !!                   11/2014 : Write XSOILGRID as a series of real 
-!!      P. Samuelsson 10/2014 : MEB
-!!      M. Moge      02/2015 parallelization using WRITE_LCOVER
-!!    10/2016 B. Decharme : bug surface/groundwater coupling   
+!!      P. Samuelsson 10/2014: MEB
+!!      M. Moge      02/2015   parallelization using WRITE_LCOVER
+!!      B. Decharme  10/2016 : bug surface/groundwater coupling   
+!!      A. Druel     02/2019 : Add variables for irrigation
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
 !              ------------
 !
 #ifdef SFX_OL
-USE MODN_IO_OFFLINE, ONLY : LWR_VEGTYPE
+USE MODN_IO_OFFLINE,     ONLY : LWR_VEGTYPE
 #endif
 !
-USE MODD_DATA_ISBA_n, ONLY : DATA_ISBA_t
-USE MODD_DATA_TSZ0_n, ONLY : DATA_TSZ0_t
-USE MODD_SFX_GRID_n, ONLY : GRID_t
-USE MODD_SSO_n, ONLY : SSO_t
+USE MODD_DATA_ISBA_n,    ONLY : DATA_ISBA_t
+USE MODD_DATA_TSZ0_n,    ONLY : DATA_TSZ0_t
+USE MODD_SFX_GRID_n,     ONLY : GRID_t
+USE MODD_SSO_n,          ONLY : SSO_t
 USE MODD_ISBA_OPTIONS_n, ONLY : ISBA_OPTIONS_t
-USE MODD_ISBA_n, ONLY : ISBA_S_t, ISBA_K_t
+USE MODD_ISBA_n,         ONLY : ISBA_S_t, ISBA_K_t
 !
-USE MODD_SURF_PAR, ONLY : XUNDEF
+USE MODD_SURF_PAR,       ONLY : XUNDEF
 USE MODD_DATA_COVER_PAR, ONLY : JPCOVER
+USE MODD_AGRI,           ONLY : LIRRIGMODE, XTHRESHOLD, NVEG_IRR, NPATCH_TREE
 !
 USE MODE_WRITE_SURF_COV, ONLY : WRITE_SURF_COV
 !
@@ -98,9 +101,11 @@ INTEGER           :: IRESP          ! IRESP  : return-code if a problem appears
 CHARACTER(LEN=12) :: YRECFM         ! Name of the article to be read
 CHARACTER(LEN=100):: YCOMMENT       ! Comment string
 CHARACTER(LEN=4 ) :: YLVL
+CHARACTER(LEN=6 ) :: YLVL2
 !
 INTEGER :: JJ, JLAYER
 INTEGER :: ISIZE_LMEB_PATCH  ! Number of patches with MEB=true
+CHARACTER(LEN=65) :: CWORK
 !
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
@@ -174,11 +179,66 @@ YRECFM='PATCH_NUMBER'
 YCOMMENT=YRECFM
  CALL WRITE_SURF(HSELECT, HPROGRAM,YRECFM,IO%NPATCH,IRESP,HCOMMENT=YCOMMENT)
 !
+!* Name of eatch tile (patch) 
+!
+YCOMMENT='npatch name and composition'
+DO JJ=1,IO%NPATCH
+  WRITE(YRECFM,FMT='(A7,I2.2)') 'NPATCH_',JJ
+  YCOMMENT=YRECFM
+  CALL WRITE_SURF(HSELECT, HPROGRAM,YRECFM,DTV%CPATCH_NAME(JJ,1)(1:55)//'-'//DTV%CPATCH_NAME(JJ,2),IRESP,HCOMMENT=YCOMMENT)
+ENDDO
+!
 !* flag indicating if fields are computed from ecoclimap or not
 !
 YRECFM='ECOCLIMAP'
 YCOMMENT=YRECFM
  CALL WRITE_SURF(HSELECT, HPROGRAM,YRECFM,IO%LECOCLIMAP,IRESP,HCOMMENT=YCOMMENT)
+!
+!* number of irrigated vegtype 
+!
+IF ( IO%LECOCLIMAP ) THEN
+  YRECFM='NVEG_IRR'
+  YCOMMENT='Number of irrigated vegtype (with ECOSG)'
+   CALL WRITE_SURF(HSELECT, HPROGRAM,YRECFM,NVEG_IRR,IRESP,HCOMMENT=YCOMMENT)
+ENDIF
+!
+!* liste of irrigated vegtype 
+!
+IF ( NVEG_IRR /= 0 .AND. IO%LECOCLIMAP ) THEN
+  YRECFM='LIST_VEG_IRR'
+  YCOMMENT='Liste of irrigated vegtype'
+  CWORK='(/'
+  DO JJ=1,SIZE(DTV%NPAR_VEG_IRR_USE)
+    IF ( JJ /= 1 ) CWORK = TRIM(CWORK)//','
+    WRITE(YLVL,'(I4)') DTV%NPAR_VEG_IRR_USE(JJ)
+    CWORK = TRIM(CWORK)//ADJUSTL(YLVL(:LEN_TRIM(YLVL)))
+  ENDDO
+  CWORK = TRIM(CWORK)//'/)'
+  CALL WRITE_SURF(HSELECT, HPROGRAM,YRECFM,CWORK,IRESP,HCOMMENT=YCOMMENT)
+ENDIF
+!
+!* patch tree (if irrigation with ECOSG)
+!
+IF ( NVEG_IRR /= 0 .AND. IO%LECOCLIMAP ) THEN
+  YRECFM='NPATCH_TREE'
+  YCOMMENT='Corresponding NPATCH tree without irrigation'
+  CALL WRITE_SURF(HSELECT, HPROGRAM,YRECFM,NPATCH_TREE,IRESP,HCOMMENT=YCOMMENT)
+ENDIF
+!
+!* Threshold on f2 for irrigation
+!
+IF ( LIRRIGMODE ) THEN
+  YRECFM='XTHRESHOLD'
+  YCOMMENT='Threshold on f2 for irrigation'
+  CWORK='(/'
+  DO JJ=1,SIZE(XTHRESHOLD)
+    IF ( JJ /= 1 ) CWORK = TRIM(CWORK)//','
+    WRITE(YLVL2,'(F6.3)') XTHRESHOLD(JJ)
+    CWORK = TRIM(CWORK)//ADJUSTL(YLVL2(:LEN_TRIM(YLVL2)))
+  ENDDO
+  CWORK = TRIM(CWORK)//'/)'
+  CALL WRITE_SURF(HSELECT, HPROGRAM,YRECFM,CWORK,IRESP,HCOMMENT=YCOMMENT)
+ENDIF
 !
 !* logical vector indicating for which patches MEB should be applied
 !

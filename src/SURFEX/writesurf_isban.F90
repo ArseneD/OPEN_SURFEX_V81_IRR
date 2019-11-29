@@ -4,7 +4,7 @@
 !SFX_LIC for details. version 1.
 !     #########
       SUBROUTINE WRITESURF_ISBA_n (HSELECT, OSNOWDIMNC, CHI, NDST, &
-                                   IO, S, NP, NPE, KI, HPROGRAM, OLAND_USE)
+                                   IO, S, NP, NPE, NAG, KI, HPROGRAM, OLAND_USE)
 !     #####################################
 !
 !!****  *WRITESURF_ISBA_n* - writes ISBA prognostic fields
@@ -46,27 +46,31 @@
 !!      B. Decharme  09/2012 : write some key for prep_read_external
 !!      B. Decharme  04/2013 : Only 2 temperature layer in ISBA-FR
 !!      P. Samuelsson 10/2014: MEB
+!!      A. Druel     02/2019 : Add NIRR_TSC and NIRRINUM (with NAG) for irrigation
 !!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
 !              ------------
 !
-USE MODD_SURFEX_MPI, ONLY : NRANK
+USE MODD_SURFEX_MPI,     ONLY : NRANK
 !
-USE MODN_PREP_SURF_ATM, ONLY : LWRITE_EXTERN
-USE MODD_WRITE_SURF_ATM,  ONLY : LSPLIT_PATCH
+USE MODN_PREP_SURF_ATM,  ONLY : LWRITE_EXTERN
+USE MODD_WRITE_SURF_ATM, ONLY : LSPLIT_PATCH
 !
-USE MODD_CH_ISBA_n, ONLY : CH_ISBA_t
-USE MODD_DST_n, ONLY : DST_NP_t
+USE MODD_CH_ISBA_n,      ONLY : CH_ISBA_t
+USE MODD_DST_n,          ONLY : DST_NP_t
 !
 USE MODD_ISBA_OPTIONS_n, ONLY : ISBA_OPTIONS_t
-USE MODD_ISBA_n, ONLY : ISBA_NP_t, ISBA_NPE_t, ISBA_S_t
+USE MODD_ISBA_n,         ONLY : ISBA_NP_t, ISBA_NPE_t, ISBA_S_t
+USE MODD_AGRI_n,         ONLY : AGRI_NP_t
 !
-USE MODD_SURF_PAR, ONLY : NUNDEF
+USE MODD_SURF_PAR,       ONLY : NUNDEF
 !
-USE MODD_ASSIM, ONLY : LASSIM, CASSIM, CASSIM_ISBA, NIE, NENS, &
-                       XADDTIMECORR, LENS_GEN, NVAR
+USE MODD_ASSIM,          ONLY : LASSIM, CASSIM, CASSIM_ISBA, NIE, NENS, &
+                                XADDTIMECORR, LENS_GEN, NVAR
+!
+USE MODD_AGRI,           ONLY : LIRRIGMODE
 !
 USE MODD_DST_SURF
 !
@@ -76,8 +80,8 @@ USE MODI_WRITESURF_GR_SNOW
 USE MODI_ALLOCATE_GR_SNOW
 USE MODI_DEALLOC_GR_SNOW
 !
-USE YOMHOOK   ,ONLY : LHOOK,   DR_HOOK
-USE PARKIND1  ,ONLY : JPRB
+USE YOMHOOK,            ONLY : LHOOK,   DR_HOOK
+USE PARKIND1,           ONLY : JPRB
 !
 IMPLICIT NONE
 !
@@ -85,19 +89,20 @@ IMPLICIT NONE
 !              -------------------------
 !
  CHARACTER(LEN=*), DIMENSION(:), INTENT(IN) :: HSELECT 
-LOGICAL, INTENT(IN) :: OSNOWDIMNC  
+LOGICAL,              INTENT(IN)    :: OSNOWDIMNC  
 !
-TYPE(CH_ISBA_t), INTENT(INOUT) :: CHI
-TYPE(DST_NP_t), INTENT(INOUT) :: NDST
+TYPE(CH_ISBA_t),      INTENT(INOUT) :: CHI
+TYPE(DST_NP_t),       INTENT(INOUT) :: NDST
 !
 TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
-TYPE(ISBA_S_t), INTENT(INOUT) :: S
-TYPE(ISBA_NP_t), INTENT(INOUT) :: NP
-TYPE(ISBA_NPE_t), INTENT(INOUT) :: NPE
-INTEGER, INTENT(IN) :: KI
+TYPE(ISBA_S_t),       INTENT(INOUT) :: S
+TYPE(ISBA_NP_t),      INTENT(INOUT) :: NP
+TYPE(ISBA_NPE_t),     INTENT(INOUT) :: NPE
+TYPE(AGRI_NP_t),      INTENT(INOUT) :: NAG
+INTEGER,              INTENT(IN)    :: KI
 !
- CHARACTER(LEN=6),  INTENT(IN)  :: HPROGRAM ! program calling
-LOGICAL,           INTENT(IN)  :: OLAND_USE !
+ CHARACTER(LEN=6),    INTENT(IN)    :: HPROGRAM ! program calling
+LOGICAL,              INTENT(IN)    :: OLAND_USE !
 !
 !*       0.2   Declarations of local variables
 !              -------------------------------
@@ -115,6 +120,7 @@ INTEGER :: IWORK   ! Work integer
 INTEGER :: JSV
 INTEGER :: ISIZE_LMEB_PATCH
 INTEGER :: JVAR
+REAL, DIMENSION(:), ALLOCATABLE :: ZWORK
 !
 REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
@@ -231,6 +237,34 @@ IF ( TRIM(CASSIM_ISBA)=="ENKF" .AND. (LASSIM .OR. NIE/=0) ) THEN
       ENDDO
     ENDIF
   ENDDO
+ENDIF
+!
+IF ( LIRRIGMODE ) THEN
+  !
+  !* Irrigation time step counter (current irrigation + time before another irrigation)
+  !
+  YRECFM='IRR_TSTEP'
+  YCOMMENT='X_Y_Time_Step_Counter'
+  DO JP = 1,IO%NPATCH
+    ALLOCATE(ZWORK(SIZE(NAG%AL(JP)%NIRR_TSC(:),1)))
+    ZWORK(:)=NAG%AL(JP)%NIRR_TSC(:)
+    CALL WRITE_FIELD_1D_PATCH(HSELECT,HPROGRAM,YRECFM,YCOMMENT,JP,&
+                NP%AL(JP)%NR_P,ZWORK(:),KI,S%XWORK_WR)
+    DEALLOCATE(ZWORK)
+  ENDDO
+  !
+  !* Irrigation number (from the beguinning of the season)
+  !
+  YRECFM='IRR_NUM'
+  YCOMMENT='X_Y_Irrigation_number'
+  DO JP = 1,IO%NPATCH
+    ALLOCATE(ZWORK(SIZE(NAG%AL(JP)%NIRRINUM(:),1)))
+    ZWORK(:)=NAG%AL(JP)%NIRRINUM(:)
+    CALL WRITE_FIELD_1D_PATCH(HSELECT,HPROGRAM,YRECFM,YCOMMENT,JP,&
+                NP%AL(JP)%NR_P,ZWORK(:),KI,S%XWORK_WR)
+    DEALLOCATE(ZWORK)
+  ENDDO
+  !
 ENDIF
 !
 !* snow mantel

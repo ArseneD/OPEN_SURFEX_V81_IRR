@@ -35,6 +35,8 @@ MODULE MODE_READ_SURF_ASC
 !!
 !!      original                                                     01/08/03
 !!      J.Escobar      10/06/2013: replace DOUBLE PRECISION by REAL to handle problem for promotion of real on IBM SP
+!!      A.Druel           02/2019: Change length 40 to 160
+!!
 !----------------------------------------------------------------------------
 !
 INTERFACE READ_SURF0_ASC
@@ -606,9 +608,9 @@ IMPLICIT NONE
 !
 !
 !
- CHARACTER(LEN=*),  INTENT(IN)  :: HREC      ! name of the article to be read
- CHARACTER(LEN=40),  INTENT(OUT) :: HFIELD    ! the integer to be read
-INTEGER,            INTENT(OUT) :: KRESP     ! KRESP  : return-code if a problem appears
+ CHARACTER(LEN=*),   INTENT(IN)  :: HREC      ! name of the article to be read
+ CHARACTER(LEN=160), INTENT(OUT) :: HFIELD    ! the integer to be read
+INTEGER,             INTENT(OUT) :: KRESP     ! KRESP  : return-code if a problem appears
  CHARACTER(LEN=100), INTENT(OUT) :: HCOMMENT  ! comment
 !
 !*      0.2   Declarations of local variables
@@ -633,7 +635,7 @@ IF (.NOT. GFOUND) CALL POSNAM(NUNIT,'FULL  '//' '//HREC,GFOUND,NLUOUT) ! used fo
 !
 READ(NUNIT,FMT=*,IOSTAT=IRESP)
 READ(NUNIT,FMT='(A50)',IOSTAT=IRESP) YCOMMENT
-READ(NUNIT,FMT='(A40)',IOSTAT=IRESP) HFIELD
+READ(NUNIT,FMT='(A160)',IOSTAT=IRESP) HFIELD
 !
 IF (IRESP/=0) CALL ERROR_READ_SURF_ASC(HREC,KRESP)
 

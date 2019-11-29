@@ -35,8 +35,9 @@
 !!    ------------
 !!
 !!    Original    16/11/10
-!!    G. Pigeon     /09/12: add ROUGH_ROOF and ROUGH_WALL coef for outdoor conv. coef
-!!    V. Masson      08/13  adds solar panels
+!!    G. Pigeon    09/2012: add ROUGH_ROOF and ROUGH_WALL coef for outdoor conv. coef
+!!    V. Masson    08/2013  adds solar panels
+!!    A. Druel     02/2019  Add ARV case
 !!
 !----------------------------------------------------------------------------
 !
@@ -130,7 +131,7 @@ REAL(KIND=JPRB) :: ZHOOK_HANDLE
 !
 IF (LHOOK) CALL DR_HOOK('CONVERT_PATCH_TEB',0,ZHOOK_HANDLE)
 !
-IF (TOP%CBLD_ATYPE=='ARI') THEN
+IF (TOP%CBLD_ATYPE=='ARI' .OR. TOP%CBLD_ATYPE=='ARV') THEN
   YAVG=TOP%CBLD_ATYPE
   YAREA='BLD'
 ELSE

@@ -33,7 +33,9 @@
 !!    -------------
 !!      Original    01/2003
 !!      B. Decharme 07/2011 : Suppress pgd output
-!       B. Decharme 07/2011 : land_use key for writing semi-prognostic variables
+!!      B. Decharme 07/2011 : land_use key for writing semi-prognostic variables
+!!      A. Druel    02/2019 : Change CALL of WRITESURF_ISBA_n
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
@@ -91,7 +93,7 @@ IF (LHOOK) CALL DR_HOOK('WRITE_ISBA_N',0,ZHOOK_HANDLE)
 !
  CALL INIT_IO_SURF_n(DTCO, U, HPROGRAM,'NATURE','ISBA  ','WRITE','ISBA_PROGNOSTIC.OUT.nc')
 !
- CALL WRITESURF_ISBA_n(HSELECT, OSNOWDIMNC, IM%CHI, NDST, IM%O, IM%S, IM%NP, IM%NPE, &
+ CALL WRITESURF_ISBA_n(HSELECT, OSNOWDIMNC, IM%CHI, NDST, IM%O, IM%S, IM%NP, IM%NPE, IM%NAG, &
                        U%NSIZE_NATURE, HPROGRAM,OLAND_USE)
 !
 IF ((.NOT.LNOWRITE_CANOPY).OR.SIZE(HSELECT)>0) THEN

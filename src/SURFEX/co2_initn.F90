@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-      SUBROUTINE CO2_INIT_n (IO, S, PK, PEK, KSIZE, PCO2   )
+      SUBROUTINE CO2_INIT_n (IO, S, PK, PEK, KSIZE, PCO2, NPAR_VEG_IRR_USE)
 !     #####################
 !
 !!****  *CO2_INIT_n* - routine to initialize ISBA-AGS variables
@@ -40,6 +40,7 @@
 !!      A.L. Gibelin 04/2009 : Add carbon spinup
 !!      A.L. Gibelin 07/2009 : Suppress RDK and transform GPP as a diagnostic
 !!      A.L. Gibelin 07/2009 : Suppress PPST and PPSTF as outputs
+!!      A. Druel     02/2019 : transmit NPAR_VEG_IRR_USE for irrigation
 !!
 !-------------------------------------------------------------------------------
 !
@@ -64,13 +65,15 @@ IMPLICIT NONE
 !              -------------------------
 !
 TYPE(ISBA_OPTIONS_t), INTENT(INOUT) :: IO
-TYPE(ISBA_S_t), INTENT(INOUT) :: S
-TYPE(ISBA_P_t), INTENT(INOUT) :: PK
-TYPE(ISBA_PE_t), INTENT(INOUT) :: PEK
+TYPE(ISBA_S_t), INTENT(INOUT)       :: S
+TYPE(ISBA_P_t), INTENT(INOUT)       :: PK
+TYPE(ISBA_PE_t), INTENT(INOUT)      :: PEK
 !
-INTEGER, INTENT(IN) :: KSIZE
+INTEGER, INTENT(IN)                 :: KSIZE
 !
-REAL, DIMENSION(:), INTENT(IN) :: PCO2 ! air CO2 concentration (kg/kg)
+REAL, DIMENSION(:), INTENT(IN)      :: PCO2 ! air CO2 concentration (kg/kg)
+!
+INTEGER, DIMENSION(:), INTENT(IN)   :: NPAR_VEG_IRR_USE ! vegtype with irrigation
 !
 !*       0.2   Declarations of local variables
 !              -------------------------------
@@ -95,7 +98,7 @@ IF (MAXVAL(PEK%XGMES(:)).NE.XUNDEF .OR. MINVAL(PEK%XGMES(:)).NE.XUNDEF) THEN
 
   CALL PACK_CO2_INIT(PK%NR_P(:),KSIZE)
   !
-  CALL COTWOINIT_n(IO, S, PK, PEK, ZP_CO2 )
+  CALL COTWOINIT_n(IO, S, PK, PEK, ZP_CO2, NPAR_VEG_IRR_USE)
 
   PK%XINCREASE = 0.
   PK%XTURNOVER = 0.

@@ -68,6 +68,8 @@ SUBROUTINE COUPLING_ISBA_n (DTCO, UG, U, USS, NAG, CHI, NCHI, DTI, ID, NGB, GB, 
 !!      P Samuelsson 10/2014 : MEB
 !!      P. LeMoigne  12/2014 EBA scheme update
 !!      R. Seferian  05/2015 : Add coupling fiels to vegetation_evol call
+!!      A. Druel     02/2019 : Adapt the code to be compatible with new irrigation
+!!                             and avoid agricultural pratices for trees / shrubs
 !!-------------------------------------------------------------------
 !
 USE MODD_DATA_COVER_n, ONLY : DATA_COVER_t
@@ -103,14 +105,13 @@ USE MODD_SLT_SURF
 USE MODE_DSLT_SURF
 USE MODE_MEB
 !
-USE MODD_AGRI,           ONLY : LAGRIP
+USE MODD_AGRI,           ONLY : LAGRIP, LIRRIGMODE
 USE MODD_DEEPSOIL,       ONLY : LDEEPSOIL
 !
 #ifdef TOPD
 USE MODD_COUPLING_TOPD,  ONLY : LCOUPL_TOPD, NMASKT_PATCH
 #endif
 !
-USE MODI_IRRIGATION_UPDATE
 USE MODI_ADD_FORECAST_TO_DATE_SURF
 USE MODI_Z0EFF
 USE MODI_ISBA
@@ -311,8 +312,12 @@ REAL                       :: ZCONVERTFACM6_SLT, ZCONVERTFACM6_DST
 INTEGER :: ISWB   ! number of spectral shortwave bands
 INTEGER :: JSWB   ! loop on number of spectral shortwave bands
 INTEGER :: JP ! loop on patches
-INTEGER :: JSV, IDST, IMOMENT, II, IMASK, JI
+INTEGER :: JSV, IDST, IMOMENT, II, IMASK, JI, JK
 INTEGER :: JLAYER, JMODE, JSV_IDX
+!
+INTEGER :: NIS_TREE
+LOGICAL :: LIS_TREE
+CHARACTER(LEN=4), DIMENSION(10) :: TREE_LIST
 !
 ! logical units
 !
@@ -400,12 +405,6 @@ ENDDO
 !
 ISWB = KSW
 !
-!* irrigation
-!
-IF (LAGRIP .AND. (IO%CPHOTO=='NIT'.OR. IO%CPHOTO=='NCB') ) THEN
-   CALL IRRIGATION_UPDATE(NAG, NPE, IO%NPATCH, PTSTEP, KMONTH, KDAY, PTIME  )  
-ENDIF
-!
 !* Actualization of the SGH variable (Fmu, Fsat)
 !
  CALL ISBA_SGH_UPDATE(IG%XMESH_SIZE, IO, S, K, NK, NP, NPE, PRAIN )
@@ -467,21 +466,31 @@ S%TTIME%TIME = S%TTIME%TIME + PTSTEP
 ! --------------------------------------------------------------------------------------
 !
 PATCH_LOOP: DO JP=1,IO%NPATCH
-  
+  !
   IF (NP%AL(JP)%NSIZE_P == 0 ) CYCLE
-!
-! Pack dummy arguments for each patch:
-!
+  !
+  ! Pack dummy arguments for each patch:
+  !
 #ifdef TOPD
-  IF (LCOUPL_TOPD) THEN
-    NMASKT_PATCH(:) = 0
-    NMASKT_PATCH(1:NP%AL(JP)%NSIZE_P) = NP%AL(JP)%NR_P(:)
-  ENDIF
+    IF (LCOUPL_TOPD) THEN
+      NMASKT_PATCH(:) = 0
+      NMASKT_PATCH(1:NP%AL(JP)%NSIZE_P) = NP%AL(JP)%NR_P(:)
+    ENDIF
 #endif
+  !
+  ! Check if is tree or not to OAGRIP
+  TREE_LIST = (/"BOBD","TEBD","TRBD","TEBE","TRBE","BONE","TENE","BOND","SHRB","FLTR"/)
+  NIS_TREE = 0
+  LIS_TREE = .FALSE.
+  DO JK = 1, SIZE(TREE_LIST,1)
+    NIS_TREE = NIS_TREE + INDEX(DTI%CPATCH_NAME(JP,2), TREE_LIST(JK)) 
+  ENDDO
+  IF ( NIS_TREE > 0 ) LIS_TREE = .TRUE.
+  !
   CALL TREAT_PATCH(NK%AL(JP), NP%AL(JP), NPE%AL(JP), NISS%AL(JP), NAG%AL(JP), &
                    NIG%AL(JP), NCHI%AL(JP), NDST%AL(JP), ID%ND%AL(JP), ID%NDC%AL(JP), &
-                   ID%NDE%AL(JP), ID%NDEC%AL(JP), ID%NDM%AL(JP), NGB%AL(JP)  )
-!
+                   ID%NDE%AL(JP), ID%NDEC%AL(JP), ID%NDM%AL(JP), NGB%AL(JP), LIS_TREE)
+  !
 ENDDO PATCH_LOOP
 !
 ! --------------------------------------------------------------------------------------
@@ -505,8 +514,8 @@ IF (IO%LVEGUPD) THEN
   GALB = .FALSE. 
   IF (IO%CPHOTO=='NIT'.OR.IO%CPHOTO=='NCB') GALB = .TRUE.
   DO JP = 1,IO%NPATCH
-    CALL VEGETATION_UPDATE(DTCO, DTI, IG%NDIM, IO, NK%AL(JP), NP%AL(JP), NPE%AL(JP), JP, &
-                         PTSTEP, S%TTIME, S%XCOVER, S%LCOVER,  LAGRIP,                   &
+    CALL VEGETATION_UPDATE(DTCO, DTI, IG%NDIM, IO, NK%AL(JP), NP%AL(JP), NPE%AL(JP), KMONTH, KDAY, JP, &
+                         PTSTEP, S%TTIME, S%XCOVER, S%LCOVER,  LAGRIP, U%LECOSG, LIRRIGMODE,           &
                          'NAT', GALB, NISS%AL(JP), GUPDATED             )  
   ENDDO
 !
@@ -564,9 +573,8 @@ ENDIF
 !-------------------------------------------------------------------------------------
 !
 DO JP = 1,IO%NPATCH
-  CALL UPDATE_RAD_ISBA_n(IO, S, NK%AL(JP), NP%AL(JP), NPE%AL(JP), JP, PZENITH2, PSW_BANDS, &
-                         ZDIR_ALB_TILE(:,:,JP), ZSCA_ALB_TILE(:,:,JP),                     &
-                         ZEMIS_TILE(:,JP), PDIR_SW, PSCA_SW  )
+  CALL UPDATE_RAD_ISBA_n(IO, S, NK%AL(JP), NP%AL(JP), NPE%AL(JP), JP, PZENITH2, PSW_BANDS, DTI%NPAR_VEG_IRR_USE, &
+                         ZDIR_ALB_TILE(:,:,JP), ZSCA_ALB_TILE(:,:,JP), ZEMIS_TILE(:,JP), PDIR_SW, PSCA_SW  )
 ENDDO
 !
  CALL AVERAGE_RAD(S%XPATCH, ZDIR_ALB_TILE, ZSCA_ALB_TILE, ZEMIS_TILE, &
@@ -605,7 +613,7 @@ PTRAD = S%XTSRAD_NAT
 ! --------------------------------------------------------------------------------------
 !
 IF (CHI%SVI%NBEQ>0 .AND. CHI%LCH_BIO_FLUX) THEN
- CALL CH_BVOCEM_n(CHI%SVI, NGB, GB, IO, S, NP, NPE, ZSW_FORBIO, PRHOA, PSFTS)
+ CALL CH_BVOCEM_n(CHI%SVI, NGB, GB, IO, S, NP, NPE, ZSW_FORBIO, PRHOA, DTI%NPAR_VEG_IRR_USE, PSFTS)
 ENDIF
 !
 !SOILNOX
@@ -619,7 +627,7 @@ IF (LHOOK) CALL DR_HOOK('COUPLING_ISBA_N',1,ZHOOK_HANDLE)
 CONTAINS
 !
 !=======================================================================================
-SUBROUTINE TREAT_PATCH(KK, PK, PEK, ISSK, AGK, GK, CHIK, DSTK, DK, DCK, DEK, DECK, DMK, GBK )
+SUBROUTINE TREAT_PATCH(KK, PK, PEK, ISSK, AGK, GK, CHIK, DSTK, DK, DCK, DEK, DECK, DMK, GBK, LIS_TREE)
 !
 USE MODD_ISBA_n, ONLY : ISBA_K_t, ISBA_P_t, ISBA_PE_t
 USE MODD_SFX_GRID_n, ONLY : GRID_t
@@ -648,6 +656,8 @@ TYPE(DIAG_EVAP_ISBA_t), INTENT(INOUT) :: DEK
 TYPE(DIAG_EVAP_ISBA_t), INTENT(INOUT) :: DECK
 TYPE(DIAG_MISC_ISBA_t), INTENT(INOUT) :: DMK
 TYPE(GR_BIOG_t), INTENT(INOUT) :: GBK
+!
+LOGICAL, INTENT(IN) :: LIS_TREE
 !
 REAL, DIMENSION(PK%NSIZE_P) :: ZP_ZREF    ! height of T,q forcing                 (m)
 REAL, DIMENSION(PK%NSIZE_P) :: ZP_UREF    ! height of wind forcing                (m)
@@ -939,7 +949,8 @@ ZIRRIG_GR(:)= 0.
            ZP_ALBVIS_TSOIL, ZPALPHAN, ZZ0G_WITHOUT_SNOW, ZZ0_MEBV, ZZ0H_MEBV, ZZ0EFF_MEBV,    &
            ZZ0_MEBN, ZZ0H_MEBN, ZZ0EFF_MEBN, ZP_TDEEP_A, ZP_CO2, ZP_FFGNOS, ZP_FFVNOS,        &
            ZP_EMIS, ZP_USTAR, ZP_AC_AGG, ZP_HU_AGG, ZP_RESP_BIOMASS_INST, ZP_DEEP_FLUX,       &
-           ZIRRIG_GR             )
+           ZIRRIG_GR, DTI%NPAR_VEG_IRR_USE )
+
 !
 ZP_TRAD = DK%XTSRAD
 DK%XLE  = PEK%XLE
@@ -973,7 +984,7 @@ END IF
 !
 IF (IO%CPHOTO=='NIT' .OR. IO%CPHOTO=='NCB') THEN
   CALL VEGETATION_EVOL(IO, DTI, PK, PEK, LAGRIP, PTSTEP, KMONTH, KDAY, PTIME, GK%XLAT, &
-                       ZP_RHOA, ZP_CO2, ISSK, ZP_RESP_BIOMASS_INST,  &
+                       ZP_RHOA, ZP_CO2, ISSK, ZP_RESP_BIOMASS_INST, .NOT.LIS_TREE,     &
                        ! add optional for accurate dependency to nitrogen
                        ! limitation
                         PSWDIR=ZP_GLOBAL_SW ) 
@@ -1039,7 +1050,7 @@ IF (CHI%SVI%NBEQ>0) THEN
     ISIZE = IEND - IBEG + 1 
 
     CALL CH_DEP_ISBA(KK, PK, PEK, DK, DMK, CHIK, &
-                     ZP_USTAR, ZP_TA, ZP_PA, ZP_TRAD(:), ISIZE )  
+                     ZP_USTAR, ZP_TA, ZP_PA, ZP_TRAD(:), ISIZE, DTI%NPAR_VEG_IRR_USE )  
  
     ZP_SFTS(:,IBEG:IEND) = - ZP_SV(:,IBEG:IEND) * CHIK%XDEP(:,1:CHI%SVI%NBEQ)  
 
@@ -1192,10 +1203,10 @@ ZP_QSURF (:) = DK%XQS (:)
 ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
  CALL DIAG_MISC_ISBA_n(DMK, KK, PK, PEK, AGK, IO, ID%DM%LSURF_MISC_BUDGET, &
-                       ID%DM%LVOLUMETRIC_SNOWLIQ, PTSTEP, LAGRIP, PTIME, PK%NSIZE_P )                  
+                       ID%DM%LVOLUMETRIC_SNOWLIQ, PTSTEP, PTIME, PK%NSIZE_P )                  
 !
  CALL REPROJ_DIAG_ISBA_n(DK, DEK, DMK, PEK, ID%O%LSURF_BUDGET, ID%DE%LSURF_EVAP_BUDGET, &
-                         ID%DE%LWATER_BUDGET, ID%DM%LSURF_MISC_BUDGET, ID%DM%LPROSNOW, &
+                         ID%DE%LWATER_BUDGET, ID%DM%LSURF_MISC_BUDGET, ID%DM%LPROSNOW,  &
                          IO%LMEB_PATCH(JP), ZP_SLOPE_COS)
 !
 ! Unpack ISBA diagnostics (modd_diag_isban) for each patch:ISIZE_MAX = MAXVAL(NSIZE_NATURE_P)

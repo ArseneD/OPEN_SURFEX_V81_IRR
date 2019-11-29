@@ -33,7 +33,9 @@ MODULE MODD_ISBA_n
 !!      A.L. Gibelin    07/2009 : Suppress RDK and transform GPP as a diagnostic
 !!      A.L. Gibelin    07/2009 : Suppress PPST and PPSTF as outputs
 !!      P. Samuelsson   02/2012 : MEB
-!!      B. Decharme    10/2016  bug surface/groundwater coupling 
+!!      B. Decharme     10/2016 : bug surface/groundwater coupling 
+!!      J.Etchanchu     01/2018 : Add irrigation parameters
+!!      A.Druel         02/2019 : Add XVEGTYPE2 for patch duplication (for irrigation/ agricultural pratices and ECOCLIMAP-SG)
 !!
 !-------------------------------------------------------------------------------
 !
@@ -109,6 +111,7 @@ REAL, POINTER, DIMENSION(:)   :: XEMIS_NAT         ! patch averaged emissivity  
 REAL, POINTER, DIMENSION(:,:) :: XFRACSOC ! Fraction of organic carbon in each soil layer
 !
 REAL, POINTER, DIMENSION(:,:) :: XVEGTYPE
+REAL, POINTER, DIMENSION(:,:) :: XVEGTYPE2
 !
 REAL, POINTER, DIMENSION(:,:)    :: XPATCH         ! fraction of each tile/patch   (-)
 !
@@ -212,6 +215,7 @@ REAL, POINTER, DIMENSION(:,:) :: XDIR_ALB_WITH_SNOW ! total direct albedo by ban
 REAL, POINTER, DIMENSION(:,:) :: XSCA_ALB_WITH_SNOW ! total diffuse albedo by bands
 !
 REAL, POINTER, DIMENSION(:,:) :: XVEGTYPE
+REAL, POINTER, DIMENSION(:,:) :: XVEGTYPE2
 !
 END TYPE ISBA_K_t
 !
@@ -464,8 +468,13 @@ REAL, POINTER, DIMENSION(:) :: XALBUV_SOIL       ! soil UV albedo
 !
 TYPE (DATE_TIME), POINTER, DIMENSION(:)  :: TSEED          ! date of seeding
 TYPE (DATE_TIME), POINTER, DIMENSION(:)  :: TREAP          ! date of reaping
-REAL, POINTER, DIMENSION(:)         :: XWATSUP        ! water supply during irrigation process (mm)
-REAL, POINTER, DIMENSION(:)         :: XIRRIG         ! flag for irrigation (irrigation if >0.)
+TYPE (DATE_TIME), POINTER, DIMENSION(:,:):: MULTI_TSEED    ! dates of seeding in case of multi-season
+TYPE (DATE_TIME), POINTER, DIMENSION(:,:):: MULTI_TREAP    ! dates of reaping in case of multi-season
+REAL, POINTER, DIMENSION(:)         :: XWATSUP             ! water supply during irrigation process (mm)
+REAL, POINTER, DIMENSION(:)         :: XIRRIGTYPE          ! irrigation type 
+REAL, POINTER, DIMENSION(:)         :: XIRRIGFREQ          ! irrigation maximal frequency (s)
+REAL, POINTER, DIMENSION(:)         :: XIRRIGTIME          ! irrigation amount application time (s)
+REAL, POINTER, DIMENSION(:)         :: XF2THRESHOLD        ! Threshold on f2 for irrigation with JE18 (-)
 !
 !
 END TYPE ISBA_PE_t
@@ -603,6 +612,7 @@ NULLIFY(YISBA_K%XDIR_ALB_WITH_SNOW)
 NULLIFY(YISBA_K%XSCA_ALB_WITH_SNOW)
 !
 NULLIFY(YISBA_K%XVEGTYPE)
+NULLIFY(YISBA_K%XVEGTYPE2)
 !
 IF (LHOOK) CALL DR_HOOK("MODD_ISBA_N:ISBA_K_INIT",1,ZHOOK_HANDLE)
 END SUBROUTINE ISBA_K_INIT
@@ -710,7 +720,10 @@ NULLIFY(YISBA_PE%XALBVIS_SOIL)
 NULLIFY(YISBA_PE%XALBUV_SOIL)
 !
 NULLIFY(YISBA_PE%XWATSUP)
-NULLIFY(YISBA_PE%XIRRIG)
+NULLIFY(YISBA_PE%XIRRIGTYPE)
+NULLIFY(YISBA_PE%XIRRIGFREQ)
+NULLIFY(YISBA_PE%XIRRIGTIME)
+NULLIFY(YISBA_PE%XF2THRESHOLD)
 !
 NULLIFY(YISBA_PE%XWG)
 NULLIFY(YISBA_PE%XWGI)

@@ -35,7 +35,9 @@ MODULE MODE_READ_SURF_LFI
 !!    MODIFICATIONS
 !!    -------------
 !!
-!!      original                                                     01/08/03
+!!      original         01/08/03
+!!      A.Druel           02/2019: Change length 40 to 160
+!!
 !----------------------------------------------------------------------------
 !
 INTERFACE READ_SURF0_LFI
@@ -720,13 +722,13 @@ INTEGER,            INTENT(OUT) :: KRESP    ! KRESP  : return-code if a problem 
 !
 !*      0.2   Declarations of local variables
 !
- CHARACTER(LEN=40) :: YGRID
-INTEGER           :: IGRID   ! position of data on grid
-INTEGER           :: ILENCH  ! length of comment string
-INTEGER           :: IIMAX, IJMAX
-INTEGER           :: INB ! number of articles in the file
-INTEGER           :: IRESP
-REAL(KIND=JPRB) :: ZHOOK_HANDLE
+ CHARACTER(LEN=160) :: YGRID
+INTEGER             :: IGRID   ! position of data on grid
+INTEGER             :: ILENCH  ! length of comment string
+INTEGER             :: IIMAX, IJMAX
+INTEGER             :: INB ! number of articles in the file
+INTEGER             :: IRESP
+REAL(KIND=JPRB)     :: ZHOOK_HANDLE
 !
 IF (LHOOK) CALL DR_HOOK('MODE_READ_SURF_LFI:READ_SURFN0_LFI',0,ZHOOK_HANDLE)
 !
@@ -910,9 +912,9 @@ IMPLICIT NONE
 !
 !*      0.1   Declarations of arguments
 !
- CHARACTER(LEN=*),  INTENT(IN)  :: HREC      ! name of the article to be read
- CHARACTER(LEN=40),  INTENT(OUT) :: HFIELD    ! the integer to be read
-INTEGER,            INTENT(OUT) :: KRESP     ! KRESP  : return-code if a problem appears
+ CHARACTER(LEN=*),   INTENT(IN)  :: HREC      ! name of the article to be read
+ CHARACTER(LEN=160), INTENT(OUT) :: HFIELD    ! the integer to be read
+INTEGER,             INTENT(OUT) :: KRESP     ! KRESP  : return-code if a problem appears
  CHARACTER(LEN=100), INTENT(OUT) :: HCOMMENT  ! comment
 !
 !*      0.2   Declarations of local variables

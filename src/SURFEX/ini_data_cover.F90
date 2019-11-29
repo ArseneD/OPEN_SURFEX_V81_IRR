@@ -38,9 +38,11 @@
 !!    Original    15/12/97
 !!    F.solmon    01/06/00 adaptation for patch approach
 !!    B.Decharme  01/03/09 Arrange cover by user
-!!    G.Pigeon      08/12 add ROUGH_WALL/ROUGH_ROOF
-!!    V. Masson     04/13 merges Arrange cover & garden use option in arrange_cover routine
-!!    R.Alkama      05/15 Add 7 new vegtype (19 rather than 12)
+!!    G.Pigeon     08/2012 add ROUGH_WALL/ROUGH_ROOF
+!!    V. Masson    04/2013 merges Arrange cover & garden use option in arrange_cover routine
+!!    R.Alkama     05/2015 Add 7 new vegtype (19 rather than 12)
+!!    A. Druel     02/2019 Change default values and add new parameter for irrigation
+!!
 !----------------------------------------------------------------------------
 !
 !*    0.     DECLARATION
@@ -86,7 +88,8 @@ USE MODD_DATA_COVER,     ONLY : XDATA_TOWN, XDATA_NATURE, XDATA_SEA, XDATA_WATER
                                   XDATA_H_INDUSTRY, XDATA_LE_INDUSTRY, XDATA_RE25,  &
                                   XDATA_GMES_ST, XDATA_BSLAI_ST, XDATA_SEFOLD_ST,   &
                                   XDATA_GC_ST, XDATA_DMAX_ST, TDATA_SEED,           &
-                                  TDATA_REAP, XDATA_WATSUP, XDATA_IRRIG,            &
+                                  TDATA_REAP, XDATA_WATSUP, XDATA_IRRIGTYPE,        &
+                                  XDATA_IRRIGTIME,XDATA_IRRIGFRAC,XDATA_IRRIGFREQ,XDATA_F2THRESHOLD,&
                                   XDATA_LAI_ALL_YEARS, LREAD_DATA_COVER,            &
                                   XDATA_HC_FLOOR, XDATA_TC_FLOOR, XDATA_D_FLOOR,    & 
                                   XDATA_TCOOL_TARGET, XDATA_THEAT_TARGET,           &
@@ -225,7 +228,8 @@ IF (ALLOCATED(XDATA_TOWN)) THEN
     DEALLOCATE(XDATA_SEFOLD,XDATA_SEFOLD_ST,XDATA_LAIMIN,XDATA_VEG,XDATA_GREEN)
     DEALLOCATE(XDATA_Z0,XDATA_Z0_O_Z0H,XDATA_EMIS_ECO,XDATA_SOILRC_SO2,XDATA_SOILRC_O3)
     DEALLOCATE(XDATA_CE_NITRO,XDATA_CF_NITRO,XDATA_CNA_NITRO,TDATA_SEED,TDATA_REAP)
-    DEALLOCATE(XDATA_IRRIG,XDATA_WATSUP,XDATA_GNDLITTER,XDATA_Z0LITTER,XDATA_H_VEG)
+    DEALLOCATE(XDATA_IRRIGTYPE,XDATA_IRRIGFRAC,XDATA_IRRIGFREQ, XDATA_IRRIGTIME,XDATA_F2THRESHOLD)
+    DEALLOCATE(XDATA_WATSUP,XDATA_GNDLITTER,XDATA_Z0LITTER,XDATA_H_VEG)
     DEALLOCATE(XDATA_Z0_TOWN,XDATA_ALB_ROOF,XDATA_ALB_ROAD,XDATA_ALB_WALL)
     DEALLOCATE(XDATA_EMIS_ROOF,XDATA_EMIS_ROAD,XDATA_EMIS_WALL)
     DEALLOCATE(XDATA_HC_ROOF,XDATA_HC_ROAD,XDATA_HC_WALL,XDATA_HC_FLOOR)
@@ -698,6 +702,8 @@ ALLOCATE(TDATA_SEED(JPCOVER,NVEGTYPE))
 TDATA_SEED (:,:)%TDATE%YEAR  = 9999
 TDATA_SEED (:,:)%TDATE%MONTH = NUNDEF                                
 TDATA_SEED (:,:)%TDATE%DAY   = NUNDEF                                
+!TDATA_SEED  (:,:)%TDATE%DAY   = 10 
+!TDATA_SEED  (:,:)%TDATE%MONTH = 05
 TDATA_SEED (:,:)%TIME        = 0.                              
 !
 ALLOCATE(TDATA_REAP(JPCOVER,NVEGTYPE))
@@ -705,6 +711,8 @@ ALLOCATE(TDATA_REAP(JPCOVER,NVEGTYPE))
 TDATA_REAP (:,:)%TDATE%YEAR  = 9999
 TDATA_REAP (:,:)%TDATE%MONTH = NUNDEF                                
 TDATA_REAP (:,:)%TDATE%DAY   = NUNDEF                                
+!TDATA_REAP  (:,:)%TDATE%DAY   = 10
+!TDATA_REAP  (:,:)%TDATE%MONTH = 08
 TDATA_REAP (:,:)%TIME        = 0.                              
 !
 !-------------------------------------------------------------------------------
@@ -712,9 +720,25 @@ TDATA_REAP (:,:)%TIME        = 0.
 !*    2.25   irrigated fraction
 !            ------------------
 !
-ALLOCATE(XDATA_IRRIG(JPCOVER,NVEGTYPE))
+ALLOCATE(XDATA_IRRIGTYPE(JPCOVER,NVEGTYPE))
 !
-XDATA_IRRIG (:,:) = 0.                                
+XDATA_IRRIGTYPE (:,:) = 0.
+!
+ALLOCATE(XDATA_IRRIGFRAC(JPCOVER,NVEGTYPE))
+!
+XDATA_IRRIGFRAC(:,:) = 0.05
+!
+ALLOCATE(XDATA_IRRIGFREQ(JPCOVER,NVEGTYPE))
+!
+XDATA_IRRIGFREQ(:,:) = XUNDEF
+!
+ALLOCATE(XDATA_IRRIGTIME(JPCOVER,NVEGTYPE))
+!
+XDATA_IRRIGTIME(:,:) = 28800.
+!
+ALLOCATE(XDATA_F2THRESHOLD(JPCOVER,36,NVEGTYPE))
+!
+XDATA_F2THRESHOLD(:,:,:) = XUNDEF!0.45
 !
 !-------------------------------------------------------------------------------
 !
@@ -723,7 +747,7 @@ XDATA_IRRIG (:,:) = 0.
 !
 ALLOCATE(XDATA_WATSUP(JPCOVER,NVEGTYPE))
 !
-XDATA_WATSUP (:,:) = 0.                                
+XDATA_WATSUP (:,:) = 30.                                
 !
 !-------------------------------------------------------------------------------
 !
@@ -1031,9 +1055,9 @@ ELSE
          XDATA_D_ROOF,XDATA_HC_ROAD,XDATA_TC_ROAD,XDATA_D_ROAD,                 &
          XDATA_HC_WALL,XDATA_TC_WALL,XDATA_D_WALL,XDATA_H_TRAFFIC,              &
          XDATA_LE_TRAFFIC,XDATA_H_INDUSTRY,XDATA_LE_INDUSTRY,                   &
-         XDATA_VEGTYPE,XDATA_H_TREE,XDATA_WATSUP,XDATA_IRRIG,                   &
+         XDATA_VEGTYPE,XDATA_H_TREE,XDATA_WATSUP,XDATA_IRRIGTYPE,               &
          XDATA_ROOT_DEPTH,XDATA_GROUND_DEPTH,XDATA_DICE,TDATA_SEED,             &
-         TDATA_REAP)
+         TDATA_REAP,XDATA_IRRIGTIME,XDATA_IRRIGFRAC,XDATA_IRRIGFREQ,XDATA_F2THRESHOLD)
   !
   CALL DEFAULT_LAI_ECO1_01
   CALL DEFAULT_LAI_ECO1_02
@@ -1240,20 +1264,31 @@ IF (U%LECOSG) THEN
     XDATA_LE_INDUSTRY(:)= 0.
   END WHERE
   !
-  WHERE(XDATA_VEGTYPE(:,8)>0.) 
-    XDATA_WATSUP(:,8) = 0.   
-    XDATA_IRRIG (:,8) = 0.00
-  END WHERE
-  !                                               
-  WHERE(XDATA_VEGTYPE(:,9)>0.) 
-    XDATA_WATSUP(:,9) = 30.   
-    XDATA_IRRIG (:,9) = 1.00  
-    TDATA_SEED  (:,9)%TDATE%DAY   = 10
-    TDATA_SEED  (:,9)%TDATE%MONTH = 05
-    TDATA_REAP  (:,9)%TDATE%DAY   = 01                                                
-    TDATA_REAP  (:,9)%TDATE%MONTH = 08
-  END WHERE
-  !
+!  WHERE(XDATA_VEGTYPE(:,16)>0.) 
+!    XDATA_WATSUP(:,16) = 0.   
+!    XDATA_IRRIGTYPE (:,16) = 0.00
+!    XDATA_IRRIGFREQ (:,16) = 0.00
+!    XDATA_IRRIGTIME (:,16) = 0.00
+!  END WHERE
+!  !
+!  WHERE(XDATA_VEGTYPE(:,17)>0.) 
+!    XDATA_WATSUP(:,17) = 0.   
+!    XDATA_IRRIGTYPE (:,17) = 0.00
+!    XDATA_IRRIGFREQ (:,17) = 0.00
+!    XDATA_IRRIGTIME (:,17) = 0.00
+!  END WHERE
+!  !
+!  WHERE(XDATA_VEGTYPE(:,18)>0.) 
+!    XDATA_WATSUP(:,18) = 30.   
+!    XDATA_IRRIGTYPE (:,18) = 1.00  
+!    XDATA_IRRIGFREQ (:,18) = 518400
+!    XDATA_IRRIGTIME (:,18) = 28800
+!    TDATA_SEED  (:,18)%TDATE%DAY   = 10
+!    TDATA_SEED  (:,18)%TDATE%MONTH = 05
+!    TDATA_REAP  (:,18)%TDATE%DAY   = 01                                                
+!    TDATA_REAP  (:,18)%TDATE%MONTH = 08
+!  END WHERE
+!  !
 ELSE
 
   !For one cover, the soil albedo from CM13 is the same for each vegtype
@@ -2515,6 +2550,7 @@ ELSE
   CNAMES(573,2)='LANGUEDOC VINEYARDS1'
 ENDIF
 
+
 IF (.NOT. ALLOCATED(CNAME)) ALLOCATE(CNAME(JPCOVER))
 IF (CLANG=='EN') THEN
   DO JCOV=1,JPCOVER
@@ -2532,7 +2568,7 @@ ENDIF
 !*    9.     Arrange cover (optional nam_pgd_arrange_cover & option to use !gardens or not)
 !            ------------------------------------------------------------------------------
 !
- CALL ARRANGE_COVER(DTCO, U%LWATER_TO_NATURE, U%LTOWN_TO_ROCK,                   &
+ CALL ARRANGE_COVER(DTCO, U%LECOSG, U%LWATER_TO_NATURE, U%LTOWN_TO_ROCK,         &
                     XDATA_NATURE,XDATA_TOWN,XDATA_SEA,XDATA_WATER,XDATA_VEGTYPE, &
                     XDATA_GARDEN,U%LGARDEN, XDATA_BLD, XDATA_WALL_O_HOR            )
 !

@@ -56,6 +56,8 @@
 !       B. decharme 04/2013 : Add new diag for coupling
 !                             Delete XTSRAD (because same than XTSRAD_NAT)
 !!      P. Samuelsson 10/2014: MEB
+!!      A. Druel      02/2019: Changes LARGIP flag to LIRRIGMODE flog for irrigation paramaters... (and delete XSEUIL)
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.0    DECLARATIONS
@@ -76,7 +78,7 @@ USE MODN_IO_OFFLINE,     ONLY : LRESTART
 #endif
 USE MODD_SURF_PAR,       ONLY : XUNDEF
 USE MODD_TYPE_DATE_SURF
-USE MODD_AGRI,           ONLY : LAGRIP
+USE MODD_AGRI,           ONLY : LIRRIGMODE
 !
 USE MODI_PACK_SAME_RANK
 USE MODI_MAKE_CHOICE_ARRAY
@@ -450,7 +452,7 @@ IF ( GCUMUL ) THEN
     !
     GDIM2 = (IVERSION>8 .OR. IVERSION==8 .AND. IBUG>0)
     GDIM = GDIM2
-    IF (GDIM2) CALL READ_SURF(HPROGRAM,'SPLIT_PATCH',GDIM,IRESP)    
+    IF (GDIM2) CALL READ_SURF(HPROGRAM,'SPLIT_PATCH',GDIM,IRESP)
     !
 #ifdef SFX_OL
     IF(DE%LWATER_BUDGET .OR. (LRESTART .AND. .NOT.DGO%LRESET_BUDGETC))THEN
@@ -610,7 +612,7 @@ IF ( GCUMUL ) THEN
         CALL PACK_SAME_RANK(NP%AL(JP)%NR_P,ZWORK(:,JP),NDEC%AL(JP)%XMELT(:))
       ENDDO          
       !
-      IF (LAGRIP) THEN
+      IF (LIRRIGMODE) THEN
         YREC='IRRIGC_'//YREC2
         CALL MAKE_CHOICE_ARRAY(HPROGRAM, IO%NPATCH, GDIM, YREC, ZWORK)
         DO JP = 1,IO%NPATCH
@@ -1264,16 +1266,6 @@ IF (KLUAP>0) THEN
   DMA%XSNOWLIQ = XUNDEF
   DMA%XSNOWTEMP= XUNDEF
   DMA%XSNOWDZ  = XUNDEF  
-ENDIF
-!
-IF (LAGRIP) THEN
-  ALLOCATE(DMA%XSEUIL         (KLUAP))
-  !
-  IF (KLUAP>0) THEN
-    DMA%XSEUIL         = XUNDEF
-  ENDIF
-ELSE
-  ALLOCATE(DMA%XSEUIL(0))
 ENDIF
 !
 IF (IO%LTR_ML) THEN

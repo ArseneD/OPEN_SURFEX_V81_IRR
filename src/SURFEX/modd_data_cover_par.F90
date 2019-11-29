@@ -34,6 +34,8 @@
 !!      (V.Masson)     15/03/99 add number of layers
 !!      (A.Boone)      02/05/02 add ISBA-ES parameters
 !!      (R.Alkama)     05/2012  add 7 new vegtypes (19 rather than 12)
+!!      (A.Druel)      02/2019  double NPATCH_MAX (for irrigation patch duplication with ECOCLIMAP-SG)
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.   DECLARATIONS
@@ -52,6 +54,7 @@ INTEGER, PARAMETER    :: NCOVER_ECO2_START  = 301
 !
 INTEGER, PARAMETER :: NVEGTYPE_OLD = 19
 INTEGER, PARAMETER :: NVEGTYPE_ECOSG = 20
+INTEGER, PARAMETER :: NPATCH_MAX = NVEGTYPE_ECOSG * 2
 !
 INTEGER, PARAMETER :: NWATTYPE = 2
 INTEGER, PARAMETER :: NSEATYPE = 1

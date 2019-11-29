@@ -3,7 +3,7 @@
 !SFX_LIC version 1. See LICENSE, CeCILL-C_V1-en.txt and CeCILL-C_V1-fr.txt  
 !SFX_LIC for details. version 1.
 !     #########
-SUBROUTINE PREP_HOR_ISBA_FIELD (DTCO, UG, U, USS, GCP, IG, IO, S, NK, NP, NPE, TPTIME,  &
+SUBROUTINE PREP_HOR_ISBA_FIELD (DTCO, UG, U, USS, GCP, IG, IO, S, NK, NP, NPE, TPTIME, NPAR_VEG_IRR_USE, &
                                 HPROGRAM,HSURF,HATMFILE,HATMFILETYPE,HPGDFILE,HPGDFILETYPE,YDCTL,OKEY)
 !     #################################################################################
 !
@@ -31,11 +31,13 @@ SUBROUTINE PREP_HOR_ISBA_FIELD (DTCO, UG, U, USS, GCP, IG, IO, S, NK, NP, NPE, T
 !!      B. Decharme  01/2009, Optional Arpege deep soil temperature initialization
 !!      M. Lafaysse  07/2012, allow netcdf input files
 !!      B. Decharme  07/2012, Bug init uniform snow
-!!      M. Lafaysse 11/2012,  snow liquid water content
+!!      M. Lafaysse  11/2012, snow liquid water content
 !!      B. Decharme  03/2014, external init with FA files
 !!                            new vertical interpolation
 !!      P Samuelsson 10/2014, MEB
 !!      P. Marguinaud10/2014, Support for a 2-part PREP
+!!      A. Druel     02/2019, Adapt the code and transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !!------------------------------------------------------------------
 !
 USE MODD_TYPE_SNOW
@@ -54,7 +56,8 @@ USE MODD_SURF_ATM_n, ONLY : SURF_ATM_t
 USE MODD_SSO_n, ONLY : SSO_t
 USE MODD_GRID_CONF_PROJ_n, ONLY : GRID_CONF_PROJ_t
 !
-USE MODD_PREP,     ONLY : CINGRID_TYPE, CINTERP_TYPE, XZS_LS, LINTERP, CMASK
+USE MODD_PREP,     ONLY : CINGRID_TYPE, CINTERP_TYPE, XZS_LS, &
+                          LINTERP, CMASK
 USE MODD_GRID_GRIB, ONLY : CINMODEL  
 !
 USE MODD_PREP_ISBA, ONLY : XGRID_SOIL, NGRID_LEVEL, LSNOW_IDEAL,    &
@@ -65,6 +68,7 @@ USE MODD_PREP_ISBA, ONLY : XGRID_SOIL, NGRID_LEVEL, LSNOW_IDEAL,    &
 USE MODD_ISBA_PAR,       ONLY : XWGMIN
 USE MODD_DATA_COVER_PAR, ONLY : NVEGTYPE
 USE MODD_SURF_PAR,       ONLY : XUNDEF,NUNDEF
+USE MODD_AGRI,           ONLY : NVEG_IRR
 !
 USE MODE_PREP_CTL, ONLY : PREP_CTL, PREP_CTL_INT_PART2, PREP_CTL_INT_PART4
 !
@@ -116,6 +120,7 @@ TYPE(GRID_CONF_PROJ_t),INTENT(INOUT) :: GCP
 !
 TYPE (PREP_CTL),    INTENT(INOUT) :: YDCTL
 !
+INTEGER,DIMENSION(:), INTENT(IN) :: NPAR_VEG_IRR_USE ! vegtype with irrigation
  CHARACTER(LEN=6),   INTENT(IN)  :: HPROGRAM  ! program calling surf. schemes
  CHARACTER(LEN=7),   INTENT(IN)  :: HSURF     ! type of field
  CHARACTER(LEN=28),  INTENT(IN)  :: HATMFILE    ! name of the Atmospheric file
@@ -235,8 +240,8 @@ IF (HSURF=='SN_VEG ') THEN
   CALL PREP_HOR_SNOW_FIELDS(DTCO, IG, U, GCP, HPROGRAM, HSURF,   &
                             YFILE_SNOW, YFILETYPE_SNOW,          &
                             YFILEPGD_SNOW, YFILEPGDTYPE_SNOW,    &
-                            ILUOUT, GUNIF_SNOW, IO%NPATCH, 1,    &
-                            INI,TNPSNOW, TPTIME,                 &
+                            ILUOUT, GUNIF_SNOW, IO%NPATCH,       &
+                            NPAR_VEG_IRR_USE,1,INI,TNPSNOW,TPTIME,&
                             XWSNOW, XRSNOW, XTSNOW, XLWCSNOW,    &
                             XASNOW, LSNOW_IDEAL, XSG1SNOW,       &
                             XSG2SNOW, XHISTSNOW, XAGESNOW, YDCTL,&
@@ -295,7 +300,8 @@ IF (YDCTL%LPART1) THEN
     IF (NRANK==NPIO) CALL PREP_ISBA_GRIB(HPROGRAM,HSURF,YFILE,ILUOUT,ZFIELDIN)        
   ELSE IF (YFILETYPE=='MESONH' .OR. YFILETYPE=='ASCII ' .OR. YFILETYPE=='LFI   '&
           .OR.YFILETYPE=='FA    '.OR. YFILETYPE=='AROME '.OR.YFILETYPE=='NC    ') THEN
-    CALL PREP_ISBA_EXTERN(DTCO, IO, U, GCP, HPROGRAM,HSURF,YFILE,YFILETYPE,YFILEPGD,YFILEPGDTYPE,ILUOUT,ZFIELDIN,OKEY)
+    CALL PREP_ISBA_EXTERN(DTCO, IO, U, GCP, NPAR_VEG_IRR_USE, &
+                          HPROGRAM,HSURF,YFILE,YFILETYPE,YFILEPGD,YFILEPGDTYPE,ILUOUT,ZFIELDIN,OKEY)
   ELSE IF (YFILETYPE=='BUFFER') THEN
     CALL PREP_ISBA_BUFFER(IG, U, HPROGRAM,HSURF,ILUOUT,ZFIELDIN)
   ELSE IF (YFILETYPE=='NETCDF') THEN
@@ -336,7 +342,7 @@ IF (YDCTL%LPART3) THEN
   ALLOCATE(ZPATCH(INI,INP))
   ZPATCH(:,:) = 0.
 !
-  CALL GET_PREP_INTERP(INP,IO%NPATCH,S%XVEGTYPE,S%XPATCH,ZPATCH)
+  CALL GET_PREP_INTERP(INP,IO%NPATCH,S%XVEGTYPE2,S%XPATCH,ZPATCH,NPAR_VEG_IRR_USE)
 !
   DO JP = 1, INP
   ! we interpolate each point the output patch is present
@@ -362,8 +368,8 @@ IF (YDCTL%LPART5) THEN
   !
     IF (IO%NPATCH/=INP) THEN
     !
-      ALLOCATE(ZFIELDOUTV(INI,INL,NVEGTYPE))
-      CALL PUT_ON_ALL_VEGTYPES(INI,INL,INP,NVEGTYPE,ZFIELDOUTP,ZFIELDOUTV)
+      ALLOCATE(ZFIELDOUTV(INI,INL,NVEGTYPE+NVEG_IRR))
+      CALL PUT_ON_ALL_VEGTYPES(INI,INL,INP,NVEGTYPE,NPAR_VEG_IRR_USE,ZFIELDOUTP,ZFIELDOUTV)
     !
     !*      6.     Transformation from vegtype grid to patch grid
     !
@@ -374,8 +380,8 @@ IF (YDCTL%LPART5) THEN
         !
         ALLOCATE(ZW%AL(JP)%ZOUT(PK%NSIZE_P,INL))
         !
-        CALL VEGTYPE_GRID_TO_PATCH_GRID(JP, IO%NPATCH, PK%XVEGTYPE_PATCH, PK%XPATCH,&
-                                      PK%NR_P, ZFIELDOUTV, ZW%AL(JP)%ZOUT)
+        CALL VEGTYPE_GRID_TO_PATCH_GRID(JP, IO%NPATCH, PK%XVEGTYPE_PATCH, PK%XPATCH,& 
+                                      PK%NR_P, ZFIELDOUTV, ZW%AL(JP)%ZOUT,NPAR_VEG_IRR_USE)
       ENDDO
       !
       DEALLOCATE(ZFIELDOUTV)
@@ -496,7 +502,7 @@ IF (YDCTL%LPART5) THEN
     !
     !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     !
-    CASE('TG     ') 
+    CASE('TG     ')
       IF(IO%LTEMP_ARP)THEN
         INL=IO%NTEMPLAYER_ARP
       ELSE

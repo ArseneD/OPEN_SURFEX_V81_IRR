@@ -35,7 +35,9 @@
 !!      Original    01/2003 
 !!      P. Le Moigne 12/2004 : add type of photosynthesis
 !!      R. Alkama    05/2012 : Add 7 new vegtypes (19 rather than 12)
-!!      B. Decharme    05/13 : new param for equatorial forest
+!!      B. Decharme  05/2013 : new param for equatorial forest
+!!      A. Druel     02/2019 : transmit NPAR_VEG_IRR_USE for irrigation
+!!
 !-------------------------------------------------------------------------------
 !
 !*       0.    DECLARATIONS
@@ -823,14 +825,17 @@ DO JI=1,KDIM
                                /( DTV%XPAR_FRAC_HVEG(JI)+DTV%XPAR_FRAC_LVEG(JI))  
 ! Fraction of vegetation
   DTV%XPAR_VEG     (JI,JTIME,1) = VEG_FROM_LAI  (DTV%XPAR_LAI    (JI,JTIME,1),       &
-                                            DTV%XPAR_VEGTYPE(JI,:),GAGRI_TO_GRASS)  
+                                            DTV%XPAR_VEGTYPE(JI,:),GAGRI_TO_GRASS,   &
+                                            NPAR_VEG_IRR_USE=DTV%NPAR_VEG_IRR_USE)  
 ! Roughness length for momentum
   DTV%XPAR_Z0      (JI,JTIME,1) = Z0V_FROM_LAI  (DTV%XPAR_LAI    (JI,JTIME,1),       &
-                                            DTV%XPAR_H_TREE (JI,1),           &
-                                            DTV%XPAR_VEGTYPE(JI,:),GAGRI_TO_GRASS)  
+                                            DTV%XPAR_H_TREE (JI,1),                  &
+                                            DTV%XPAR_VEGTYPE(JI,:),GAGRI_TO_GRASS,   &
+                                            NPAR_VEG_IRR_USE=DTV%NPAR_VEG_IRR_USE)  
 ! Emissivity
   DTV%XPAR_EMIS    (JI,JTIME,1) = EMIS_FROM_VEG (DTV%XPAR_VEG    (JI,JTIME,1),       &
-                                            DTV%XPAR_VEGTYPE(JI,:))
+                                            DTV%XPAR_VEGTYPE(JI,:),                  &
+                                            NPAR_VEG_IRR_USE=DTV%NPAR_VEG_IRR_USE)
  END DO
 !
 ENDDO
